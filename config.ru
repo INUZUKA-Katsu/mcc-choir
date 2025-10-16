@@ -93,7 +93,7 @@ class Choir
           response = get_mp3(path)
           header["content-length"] = response.size.to_s
         end
-      when /^\/連絡事項\.txt$/
+      when /連絡事項\.txt$/
         info = get_information()
         header["content-type"] = 'text/plain;charset=UTF-8'
         response = info
