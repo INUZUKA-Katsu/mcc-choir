@@ -9,6 +9,10 @@ require 'fileutils'
 Encoding.default_external = "utf-8"
 
 class Choir
+  def initialize()
+    @access_token = get_dropbox_access_token
+    @client = DropboxApi::Client.new(@access_token)
+  end
   # callメソッドはenvを受け取り、3つの値(StatusCode, Headers, Body)を配列として返す
   def call(env)
   	req  = Rack::Request.new(env)
@@ -200,14 +204,21 @@ class Choir
   end
   
   def get_from_dropbox(path)
-    #2021年以前にブラウザ上で手動で作成した読取り専用のアクセストークンは有効期限がない。
-    client = DropboxApi::Client.new(get_dropbox_access_token)
     contents = ""
+    unless @client
+      begin
+        @client = DropboxApi::Client.new(@access_token)
+      rescue
+        @access_token = get_dropbox_access_token
+        @client = DropboxApi::Client.new(@access_token)
+      end
+    end
     begin
-      client.download path do |chunk|
+      @client.download path do |chunk|
         contents << chunk
       end
     rescue=>e
+      p "failed to get from dropbox: #{path} @get_from_dropbox"
       p e.message
     end
     contents
