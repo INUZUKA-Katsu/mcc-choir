@@ -318,17 +318,27 @@ EOS
     end
     info
   end
-  def update_information(new_data,path)
+  def update_information(new_data,path,count=0)
     info_path   = get_info_path()
     backup_path = info_path.sub(/\.txt/,".bak")
-    access_token = get_dropbox_access_token
-    client = DropboxApi::Client.new(access_token)
 
     #既存のバックアップファイルを削除する。
     begin  
-      client.delete(backup_path)
+      @client.delete(backup_path)
+    
     rescue DropboxApi::Errors::NotFoundError
       # バックアップファイルがないとき
+    
+    rescue DropboxApi::Errors::ExpiredAccessTokenError
+      # アクセストークンが有効期限切れの場合
+      if count > 3
+        puts "error: access_token is expired and failed to get new token:  @update_information #{info_path}"
+        return nil
+      end
+      @access_token = get_dropbox_access_token
+      @client = DropboxApi::Client.new(@access_token)
+      update_information(new_data,path,count+1)
+    
     rescue=>e
       p "failed to delete backup"
       puts "backup is "+backup_path
@@ -338,14 +348,14 @@ EOS
     
     #現在のファイルをリネームする（バックアップ）。
     begin
-      client.move(info_path, backup_path)
+      @client.move(info_path, backup_path)
     rescue DropboxApi::Errors::NotFoundError
       # 既存の 連絡事項.txt がないとき
     end
     p :continue2
 
     #上書き更新
-    client.upload(info_path, new_data, mode: :overwrite)
+    @client.upload(info_path, new_data, mode: :overwrite)
   end
   def get_info_path()
     "/mp3/連絡事項.txt"
@@ -357,8 +367,8 @@ EOS
     #動的に取得する。
     if @access_token
       begin
-        client = DropboxApi::Client.new(@access_token)
-        metadata = client.get_metadata("/mp3")
+        @client = DropboxApi::Client.new(@access_token)
+        metadata = @client.get_metadata("/mp3")
         return @access_token #既存の@access_tokenが有効なとき
       ensure
         #@access_tokenが無効のときは以下に進む。
@@ -375,12 +385,10 @@ EOS
     @access_token=JSON.parse(res)["access_token"]
     @access_token
   end
-  def dropbox_file_exist?(file_path)
-    token = get_dropbox_access_token
-    client = DropboxApi::Client.new(token)
+  def dropbox_file_exist?(file_path, count=0)
     # チェックしたいファイルのDropboxパス（ルートからの絶対パス）
     begin
-      metadata = client.get_metadata(file_path)
+      metadata = @client.get_metadata(file_path)
       if metadata.is_a?(DropboxApi::Metadata::File)
         true
       else
@@ -388,6 +396,14 @@ EOS
       end
     rescue DropboxApi::Errors::NotFoundError
       nil
+    rescue DropboxApi::Errors::ExpiredAccessTokenError
+      if count > 3
+        puts "error: access_token is expired and failed to get new token:  @dropbox_file_exist? #{file_path}"
+        return nil
+      end
+      @access_token = get_dropbox_access_token
+      @client = DropboxApi::Client.new(@access_token)
+      dropbox_file_exist?(file_path, count+1)
     end
   end
 end
