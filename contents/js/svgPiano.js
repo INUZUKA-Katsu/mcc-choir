@@ -300,6 +300,71 @@ function stopNote(midi) {
     }
 }
 
+function setAudioControls(containerClassName){
+  const audioControls = [];
+  document.querySelectorAll(containerClassName).forEach(container => {
+    const partName = container.getAttribute("name");
+    if (partName) {
+      createPlayBtn(container, partName);
+      createPauseBtn(container, partName);
+      createStopBtn(container, partName);
+      createSeekBar(container, partName);
+      createTimeDisplay(container, partName);
+      createAudioControlInstance(audioControls, partName);
+    }
+  });
+  
+  function createPlayBtn(container, partName){
+    const playBtn = document.createElement("button");
+    playBtn.setAttribute("id", `playBtn-${partName}`);
+    playBtn.innerHTML = "Play";
+    container.appendChild(playBtn);
+  }
+  function createPauseBtn(container, partName){
+    const pauseBtn = document.createElement("button");
+    pauseBtn.setAttribute("id", `pauseBtn-${partName}`);
+    pauseBtn.innerHTML = "Pause";
+    container.appendChild(pauseBtn);
+  }
+  function createStopBtn(container, partName){
+    const stopBtn = document.createElement("button");
+    stopBtn.setAttribute("id", `stopBtn-${partName}`);
+    stopBtn.innerHTML = "Stop";
+    container.appendChild(stopBtn);
+  }
+  function createSeekBar(container, partName){
+    const seekBar = document.createElement("input");
+    seekBar.setAttribute("id", `seekBar-${partName}`);
+    seekBar.setAttribute("type", "range");
+    seekBar.setAttribute("min", "0");
+    seekBar.setAttribute("max", "100");
+    seekBar.setAttribute("step", "0.1");
+    seekBar.setAttribute("value", "0");
+    seekBar.style.width = "200px";
+    container.appendChild(seekBar);
+  }
+  function createTimeDisplay(container, partName){
+    const timeDisplay = document.createElement("span");
+    timeDisplay.setAttribute("id", `timeDisplay-${partName}`);
+    timeDisplay.setAttribute("class", "timeDisplay");
+    timeDisplay.innerHTML = "0:00 / 0:00";
+    container.appendChild(timeDisplay);
+  }
+  function createAudioControlInstance(audioControls,partName){
+    audioControls.push(new AudioControl({
+      name: partName,
+      playBtn: `playBtn-${partName}`,
+      pauseBtn: `pauseBtn-${partName}`,
+      stopBtn: `stopBtn-${partName}`,
+      seekBar: `seekBar-${partName}`,
+      timeDisplay: `timeDisplay-${partName}`,
+      loop: true
+    }));
+    return audioControls;
+  }
+  return audioControls;
+}
+
 class MidiPlayer {
     constructor(svgPiano, midiFile, trackIndex = null){
       this.scheduledTimeouts = [];
@@ -445,34 +510,12 @@ class MidiPlayer {
     }
 
     init() {
-      this.sound = new Howl({
-          src: [this.options.mp3File],
-          html5: false,
-          onload: () => { 
-            this.seekBar.max = this.sound.duration(); 
-            this.updateTimeDisplay();
-          },
-          onplay: () => {
-            this.seekTimer = setInterval(() => {
-              if (!this.isDragging) this.seekBar.value = this.sound.seek();
-              this.updateTimeDisplay();
-            }, 100);
-          },
-          onpause: () => { 
-            clearInterval(this.seekTimer); 
-          },
-          onstop: () => { 
-            clearInterval(this.seekTimer);  
-            this.seekBar.value = 0;
-            this.updateTimeDisplay();
-          },
-          onend: () => { 
-            clearInterval(this.seekTimer);  
-            this.seekBar.value = 0;
-            this.updateTimeDisplay();
-          }
-      });
-      
+      if (this.options.midiFile) {
+        this.setupMidiPlayer();
+      }
+      if (this.options.mp3File) {
+        this.setupMp3P();
+      }
       if (this.playBtn) this.playBtn.addEventListener('click', () => this.play());
       if (this.pauseBtn) this.pauseBtn.addEventListener('click', () => this.pause());
       if (this.stopBtn) this.stopBtn.addEventListener('click', () => this.stop());
@@ -487,19 +530,53 @@ class MidiPlayer {
         });
         this.seekBar.addEventListener('change', () => this.endSeek());
       }
-
-      this.midiPlayer = new MidiPlayer(this.options.svgPiano, this.options.midiFile, this.options.trackIndex);      
     }
-
+    setupMidiPlayer() {
+      this.midiPlayer = new MidiPlayer(
+        this.options.svgPiano, 
+        this.options.midiFile, 
+        this.options.trackIndex
+      );      
+    }
+    setupMp3P() {
+      this.sound = new Howl({
+        src: [this.options.mp3File],
+        html5: false,
+        onload: () => { 
+          this.seekBar.max = this.sound.duration(); 
+          this.updateTimeDisplay();
+        },
+        onplay: () => {
+          this.seekTimer = setInterval(() => {
+            if (!this.isDragging) this.seekBar.value = this.sound.seek();
+            this.updateTimeDisplay();
+          }, 100);
+        },
+        onpause: () => { 
+          clearInterval(this.seekTimer); 
+        },
+        onstop: () => { 
+          clearInterval(this.seekTimer);  
+          this.seekBar.value = 0;
+          this.updateTimeDisplay();
+        },
+        onend: () => { 
+          clearInterval(this.seekTimer);  
+          this.seekBar.value = 0;
+          this.updateTimeDisplay();
+        }
+      });
+    }
     update(newOptions){
       this.options = {
         ...this.options,
-        ...newOptions,
+        ...newOptions
       }
-      if (Object.keys(newOptions).includes('mp3File') ||
-          Object.keys(newOptions).includes('midiFile')) 
-      {
-        this.init();
+      if (Object.keys(newOptions).includes('midiFile')) {
+        this.setupMidiPlayer();
+      }
+      if (Object.keys(newOptions).includes('mp3File')) {
+        this.setupMp3P();
       }
     }
       
@@ -624,8 +701,8 @@ class MidiPlayer {
     }
 
     stopOtherAudio() {
-      if (window.audioControls && window.audioControls.length > 1) {
-        window.audioControls.forEach(audioControl => {
+      if (audioControls && audioControls.length > 1) {
+        audioControls.forEach(audioControl => {
           if (audioControl.isPlaying) {
             audioControl.stop();
           }
