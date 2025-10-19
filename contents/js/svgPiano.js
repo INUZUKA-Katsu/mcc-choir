@@ -16,6 +16,7 @@ class SvgPiano {
       white_key_height: 120,
       black_key_width: 24,
       black_key_height: 70,
+      volume: 0.25,
       ...options //引数で渡された値でデフォルト値を上書き
     }
     this.white_keys = [];
@@ -170,7 +171,7 @@ class SvgPiano {
                 key.style.fill = '#ccc';
                 console.log(`audioCtx.state(before): ${audioCtx.state}`);
                 stopNote(midi);
-                playNote(midi, 0.25, 2, 'triangle', 440);
+                playNote(midi, this.options.volume, 2, 'triangle', 440);
                 console.log(`audioCtx.state(after): ${audioCtx.state}`);
             });
             
@@ -179,7 +180,7 @@ class SvgPiano {
                 e.preventDefault();
                 key.style.fill = '#ccc';
                 stopNote(midi);
-                playNote(midi, 0.25, 2, 'triangle', 440);
+                playNote(midi, this.options.volume, 2, 'triangle', 440);
             });
             
             // マウスアップ
@@ -205,7 +206,7 @@ class SvgPiano {
                 if (e.button !== 0) return;
                 key.style.fill = '#3b3b3b';
                 stopNote(midi);
-                playNote(midi, 0.25, 2, 'triangle', 440);
+                playNote(midi, this.options.volume, 2, 'triangle', 440);
             });
             
             // タッチイベント
@@ -213,7 +214,7 @@ class SvgPiano {
                 e.preventDefault();
                 key.style.fill = '#ccc';
                 stopNote(midi);
-                playNote(midi, 0.25, 2, 'triangle', 440);
+                playNote(midi, this.options.volume, 2, 'triangle', 440);
             });
             
             // マウスアップ
@@ -300,27 +301,41 @@ function stopNote(midi) {
 }
 
 class MidiPlayer {
-    constructor(midiFile, svgPiano){
+    constructor(svgPiano, midiFile, trackIndex = null){
       this.scheduledTimeouts = [];
       this.piano = svgPiano;
+      this.trackIndex = trackIndex;
       this.isLoaded = false;
-      this.loadMidi(midiFile);
+      this.midi = null;
+      this.loadingPromise = this.loadMidi(midiFile);
     }
     
     async loadMidi(midiFile) {
       const midiResponse = await fetch(midiFile);
       const midiArrayBuffer = await midiResponse.arrayBuffer();
       this.midi = new Midi(midiArrayBuffer);
+      console.log("316:midi.tracks");
+      console.log(this.midi.tracks.length);
+      console.dir(this.midi.tracks);
       this.isLoaded = true;
     }
   
     // ========= MIDIハイライトのスケジューリングメソッド =========
     // 引数pianoはSvgPianoクラスのインスタンス
     async scheduleMidHeighlight(seekPosition) {
+      console.trace();
+      await this.loadingPromise; // MIDIファイルが読み込まれるのを待つ
+      
       this.scheduledTimeouts.forEach(clearTimeout);
       this.scheduledTimeouts = [];
-  
-      this.midi.tracks.forEach(track => {
+      
+      const trackIndices = this.convertedTrackIndex();
+      const tracksToProcess =
+        this.trackIndex === null
+          ? this.midi.tracks
+          : this.midi.tracks.filter((_, i) => trackIndices.includes(i));
+
+      tracksToProcess.forEach(track => {
         track.notes.forEach(note => {
           const heighlightDelay = (note.time - seekPosition) * 1000;
           const resetDelay = (note.time + note.duration - seekPosition) * 1000;  
@@ -375,18 +390,43 @@ class MidiPlayer {
         key.style.fill = "black";
       });
     }
+
+    // MIDIファイルのトラック換算(空トラックを除外)
+    convertedTrackIndex() {
+      if (this.trackIndex === null) return null;
+      const trackIndex = Array.isArray(this.trackIndex) ? this.trackIndex : [this.trackIndex];
+      const tracktable = [];
+      const converted = [];
+      console.log(`397:midi.tracks: ${this.midi.tracks}`);
+      console.dir(this.midi.tracks);
+      for (let i = 0; i < this.midi.tracks.length; i++) {
+        if (this.midi.tracks[i].hasOwnProperty('notes') && this.midi.tracks[i].notes.length > 0) {
+          tracktable.push(i);
+        }
+      }
+      console.log(tracktable);
+      for (let i = 0; i < trackIndex.length; i++) {
+        converted.push(tracktable[trackIndex[i]]);
+      }
+      console.log(`${this.trackIndex} ⇒ convertedTrackIndex: ${converted}`);
+      return converted;
+    }
   }
 
   class AudioControl {
     constructor(controls={}) {
       this.options = {
+        name: null,
         svgPiano: null,
         playBtn: 'playBtn',
         pauseBtn: 'pauseBtn',
         stopBtn: 'stopBtn',
         seekBar: 'seekBar',
+        timeDisplay: 'timeDisplay',
         mp3File: null,
         midiFile: null,
+        trackIndex: null,
+        segment: null,
         loop: false,
         ...controls,
       }
@@ -394,6 +434,7 @@ class MidiPlayer {
       this.pauseBtn = document.getElementById(this.options.pauseBtn);
       this.stopBtn = document.getElementById(this.options.stopBtn);
       this.seekBar = document.getElementById(this.options.seekBar);
+      this.timeDisplay = document.getElementById(this.options.timeDisplay);
       this.midi = null;
       this.howl = null;
       this.seekTimer = null;
@@ -409,10 +450,12 @@ class MidiPlayer {
           html5: false,
           onload: () => { 
             this.seekBar.max = this.sound.duration(); 
+            this.updateTimeDisplay();
           },
           onplay: () => {
             this.seekTimer = setInterval(() => {
               if (!this.isDragging) this.seekBar.value = this.sound.seek();
+              this.updateTimeDisplay();
             }, 100);
           },
           onpause: () => { 
@@ -421,20 +464,31 @@ class MidiPlayer {
           onstop: () => { 
             clearInterval(this.seekTimer);  
             this.seekBar.value = 0;
+            this.updateTimeDisplay();
           },
           onend: () => { 
             clearInterval(this.seekTimer);  
             this.seekBar.value = 0;
+            this.updateTimeDisplay();
           }
       });
       
-      this.playBtn.addEventListener('click', () => this.play());
-      this.pauseBtn.addEventListener('click', () => this.pause());
-      this.stopBtn.addEventListener('click', () => this.stop());
-      this.seekBar.addEventListener('input', () => this.seek());
-      this.seekBar.addEventListener('change', () => this.endSeek());
+      if (this.playBtn) this.playBtn.addEventListener('click', () => this.play());
+      if (this.pauseBtn) this.pauseBtn.addEventListener('click', () => this.pause());
+      if (this.stopBtn) this.stopBtn.addEventListener('click', () => this.stop());
+      if (this.seekBar) this.seekBar.addEventListener('input', () => this.seek());
+      if (this.seekBar) this.seekBar.addEventListener('change', () => this.endSeek());
 
-      this.midiPlayer = new MidiPlayer(this.options.midiFile, this.options.svgPiano);
+      // seekBarのイベントリスナーに時間表示更新を追加
+      if (this.seekBar) {
+        this.seekBar.addEventListener('input', () => {
+          this.seek();
+          this.updateTimeDisplay(); // シーク中に時間表示を更新
+        });
+        this.seekBar.addEventListener('change', () => this.endSeek());
+      }
+
+      this.midiPlayer = new MidiPlayer(this.options.svgPiano, this.options.midiFile, this.options.trackIndex);      
     }
 
     update(newOptions){
@@ -450,8 +504,17 @@ class MidiPlayer {
     }
       
     play() {
+      if (this.isPlaying) {
+        this.stop();
+        setTimeout(() => {
+          this.sound.seek(0);
+          this.play();
+        },1000);
+        return
+      }
       this.stopOtherAudio();
       this.scheduleMidHighlight(this.seekBar.value);
+      this.sound.seek(this.seekBar.value); //pauseしている場合はpause位置からスタート
       this.sound.play();
       this.isPlaying = true;
       // ループ再生（鍵盤ハイライトもループ）
@@ -465,6 +528,56 @@ class MidiPlayer {
         });
       }
     }
+
+    // 指定された時間区間を再生
+    playSegment(start, end) {
+      if (this.isPlaying) {
+        this.stop();
+        setTimeout(() => {
+          this.sound.seek(0);
+          this.playSegment();
+        },1000);
+        return
+      }
+      this.stopOtherAudio();
+      console.log(`this.options.segment => ${this.options.segment}`);
+      const [options_start, options_end] = this.options.segment.split(",");
+      if (start === undefined && end === undefined && this.options.segment) {
+        console.log("rout1 @playSegment");
+        [start, end] = [ Number(options_start), Number(options_end) ];
+        if (start < this.seekBar.value && this.seekBar.value < end) start = this.seekBar.value; //pauseからの再開の場合
+      
+      } else if (start !== undefined && end === undefined && this.options.segment) {
+        console.log("rout2 @playSegment");
+        [start, end] = [ Number(start), Number(options_end)] ;
+      
+      } else if (start !== undefined && end !== undefined) {
+        console.log("rout3 @playSegment");
+        [start, end] = [ Number(start), Number(end)] ;
+      }
+      console.log(`start, end => ${start},${end}`);
+
+      // 再生開始位置をstart秒に設定
+      this.sound.seek(start);
+      
+      // 再生開始
+      this.scheduleMidHighlight(start);
+      console.log("ハイライトスケジュール完了");
+      this.sound.play();
+      console.log("再生開始");
+      this.isPlaying = true;
+      
+      // end秒で再生を停止
+      const duration = (end - start) * 1000; // ミリ秒に変換
+      this.loopTimer = setTimeout(() => {
+        this.stop();
+        if (this.options.loop) {
+          setTimeout(() => {
+            this.playSegment();
+          }, 1500);
+        }
+      }, duration);
+    }
     
     pause() {
       this.sound.pause();
@@ -474,6 +587,7 @@ class MidiPlayer {
     
     stop() {
       this.sound.stop();
+      this.isPlaying = false;
       this.clearScheduledTimeouts();
       this.resetAllKeys();
       if (this.loopTimer) {
@@ -487,12 +601,14 @@ class MidiPlayer {
       this.clearScheduledTimeouts();
       this.resetAllKeys();
       this.isPlaying = false;
+      this.updateTimeDisplay();
     }
     
     endSeek() {
       this.seekBar.value = this.sound.seek();
       this.isDragging = false;
       this.scheduleMidHighlight(this.seekBar.value);
+      this.updateTimeDisplay();
     }
     
     scheduleMidHighlight(currentTime) {
@@ -510,32 +626,32 @@ class MidiPlayer {
     stopOtherAudio() {
       if (window.audioControls && window.audioControls.length > 1) {
         window.audioControls.forEach(audioControl => {
-          if (audioControl !== this && audioControl.isPlaying) {
+          if (audioControl.isPlaying) {
             audioControl.stop();
           }
         });
       }
     }
-
-    // 指定された時間区間を再生
-    playSegment(start, end) {
-      // 再生開始位置をstart秒に設定
-      this.sound.seek(start);
+    
+    // 時間を MM:SS 形式にフォーマットする関数
+    formatTime(seconds) {
+      if (!seconds || isNaN(seconds)) return '0:00';
+      const minutes = Math.floor(seconds / 60);
+      const secs = Math.floor(seconds % 60);
+      return `${minutes}:${secs.toString().padStart(2, '0')}`;
+    }
+  
+    // 時間表示を更新する関数
+    updateTimeDisplay() {
+      if (!this.timeDisplay) return;
       
-      // 再生開始
-      this.scheduleMidHighlight(start);
-      this.sound.play();
+      const currentTime = this.sound ? this.sound.seek() : 0;
+      const duration = this.sound ? this.sound.duration() : 0;
       
-      // end秒で再生を停止
-      const duration = (end - start) * 1000; // ミリ秒に変換
-      this.loopTimer = setTimeout(() => {
-        this.stop();
-        if (this.options.loop) {
-          setTimeout(() => {
-            this.playSegment(start, end);
-          }, 1500);
-        }
-      }, duration);
+      const currentFormatted = this.formatTime(currentTime);
+      const durationFormatted = this.formatTime(duration);
+      
+      this.timeDisplay.textContent = `${currentFormatted} / ${durationFormatted}`;
     }
   }
 
