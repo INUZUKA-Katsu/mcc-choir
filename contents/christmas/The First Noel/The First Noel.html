@@ -12,7 +12,8 @@
     <link rel="mask-icon" href="/img/safari-pinned-tab.svg" color="#5bbad5">
     <meta name="msapplication-TileColor" content="#da532c">
     <meta name="theme-color" content="#ffffff"!-->
-  	<script type="text/javascript" src="/js/get_mp3.js"></script>
+  	<script src="/js/get_mp3.js"></script>
+    <script src="/js/get_information.js"></script>
     <script src="/js/svgPiano.js"></script>
     <script src="/js/howler.core.js"></script>
     <script src="https://unpkg.com/@tonejs/midi"></script>
@@ -142,7 +143,10 @@
         width: "";
         display: block;
       }
-
+      div.vcl {
+        font-weight: 400;
+        margin-top: 30px;
+      }
     </style>
     <title>'The First Noel'　　パート別練習用音源</title>
 	</head>
@@ -292,6 +296,7 @@
 <audio!-- style="visibility:hidden;" src='/christmas/The First Noel/05 The First Noel (vcl_full_tmp98).mp3' controls preload="none"></audio!-->
 	
 <script>
+  // ピアノ鍵盤のSVGを作成
   const svgPiano = new SvgPiano(
     'piano-container',
     {
@@ -304,60 +309,20 @@
         volume: 0.5
     }
   );
-  window.audioControls = [];
-  document.querySelectorAll(".audio-container").forEach(container => {
-    const name = container.getAttribute("name");
-    if (name) {
-      const playBtn = document.createElement("button");
-      playBtn.setAttribute("id", `playBtn-${name}`);
-      playBtn.innerHTML = "Play";
-      container.appendChild(playBtn);
+  // パート別に play,pause,stopの各ボタン、seekBar,timeDisplay を作成
+  const audioControls = setAudioControls(".audio-container");
 
-      const pauseBtn = document.createElement("button");
-      pauseBtn.setAttribute("id", `pauseBtn-${name}`);
-      pauseBtn.innerHTML = "Pause";
-      container.appendChild(pauseBtn);
-
-      const stopBtn = document.createElement("button");
-      stopBtn.setAttribute("id", `stopBtn-${name}`);
-      stopBtn.innerHTML = "Stop";
-      container.appendChild(stopBtn);
-
-      const seekBar = document.createElement("input");
-      seekBar.setAttribute("id", `seekBar-${name}`);
-      seekBar.setAttribute("type", "range");
-      seekBar.setAttribute("min", "0");
-      seekBar.setAttribute("max", "100");
-      seekBar.setAttribute("step", "0.1");
-      seekBar.setAttribute("value", "0");
-      seekBar.style.width = "200px";
-      container.appendChild(seekBar);
-
-      const timeDisplay = document.createElement("span");
-      timeDisplay.setAttribute("id", `timeDisplay-${name}`);
-      timeDisplay.setAttribute("class", "timeDisplay");
-      timeDisplay.innerHTML = "0:00 / 0:00";
-      container.appendChild(timeDisplay);
-
-      const nameWithTempo = add_temp_to_name(name);
-      console.log(`name,nameWithTempo => ${name},${nameWithTempo}`);
-      console.log(`nameWithTempo.replace('vcl_', '') => ${nameWithTempo.replace('vcl_', '')}`);
-
-      window.audioControls.push(new AudioControl({
-        svgPiano: svgPiano,
-        name: name,
-        playBtn: `playBtn-${name}`,
-        pauseBtn: `pauseBtn-${name}`,
-        stopBtn: `stopBtn-${name}`,
-        seekBar: `seekBar-${name}`,
-        timeDisplay: `timeDisplay-${name}`,
-        mp3File: mp3Files[nameWithTempo],
-        midiFile: midiFiles[nameWithTempo.replace('vcl_', '')][0],
-        trackIndex: midiFiles[nameWithTempo.replace('vcl_', '')][1],
-        loop: true
-      }))
-    }
+  // audioControlインスタンスに、svgPiano,midiファイル,mp3ファイル等を設定
+  audioControls.forEach(audioControl => {
+    const nameWithTempo = add_temp_to_name(audioControl.options.name);
+    audioControl.update({
+      svgPiano: svgPiano,
+      mp3File: mp3Files[nameWithTempo],
+      midiFile: midiFiles[nameWithTempo.replace('vcl_', '')][0],
+      trackIndex: midiFiles[nameWithTempo.replace('vcl_', '')][1],
+    });
   });
+
   document.querySelectorAll(".playBtn").forEach(btn => {
     btn.addEventListener("click", function() {
       const commonName = btn.parentNode.getAttribute("name");
@@ -366,7 +331,7 @@
       const range = ranges(nameWithTempo,segment);
       const [start,end] = range.split(",");      
       console.log(`start,end => ${start},${end}`);
-      const audioControl = window.audioControls.find(control => control.options.name === commonName );
+      const audioControl = audioControls.find(control => control.options.name === commonName );
       audioControl.update({ segment: range })
       if (Number(start) < audioControl.seekBar.value) {
         console.log(`audioControl.seekBar.value => ${audioControl.seekBar.value}`);
@@ -388,18 +353,27 @@
     const midiFile = midiFiles[nameWithTempo.replace('vcl_', '')][0];
     const trackIndex = midiFiles[nameWithTempo.replace('vcl_', '')][1];
     
-    const audioControl = window.audioControls.find(control => control.options.name === commonName );
+    const audioControl = audioControls.find(control => control.options.name === commonName );
     if (audioControl) {
+      updateAudioControl(audioControl, mp3File, midiFile, trackIndex)
+    }
+    function updateAudioControl(audioControl, mp3File, midiFile, trackIndex) {
+      if (audioControl.isPlaying) {
         audioControl.stop();
-        if (audioControl.options.mp3File !== mp3File) {
-          console.log(`update mp3File => ${mp3File}`);
-          audioControl.update({
-            mp3File: mp3File,
-            midiFile: midiFile,
-            trackIndex: trackIndex
-          });
-        }
-     }
+        setTimeout(() => {
+          updateAudioControl(audioControl, mp3File, midiFile, trackIndex);
+        }, 100);
+        return;
+      }     
+      if (audioControl.options.mp3File !== mp3File) {
+        console.log(`update mp3File => ${mp3File}`);
+        audioControl.update({
+          mp3File: mp3File,
+          midiFile: midiFile,
+          trackIndex: trackIndex
+        });
+      }
+    }
   }  
   
   function add_temp_to_name(name) {

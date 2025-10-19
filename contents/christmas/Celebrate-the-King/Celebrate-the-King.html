@@ -5,12 +5,33 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <link rel="stylesheet" href="/css/choir.css">
     <link rel="icon" type="image/png" sizes="16x16" href="/img/favicon.ico">
-		<script type="text/javascript" src="/js/get_mp3.js"></script>
-		<script type='text/javascript'>
-      var t_ranges=[
-        [
-         ["soprano","alto","tenor","bass","full"],
-         {
+		<script src="/js/get_mp3.js"></script>
+    <script src="/js/get_information.js"></script>
+    <script src="/js/svgPiano.js"></script>
+    <script src="/js/howler.core.js"></script>
+    <script src="https://unpkg.com/@tonejs/midi"></script>
+    <script type='text/javascript'>
+      const mp3Files = {
+        "soprano"     : '/christmas/Celebrate-the-King/2-01 Celebrate-the-King (soprano2).mp3',
+        "alto"        : '/christmas/Celebrate-the-King/2-02 Celebrate-the-King (alto2).mp3',
+        "tenor"       : '/christmas/Celebrate-the-King/2-03 Celebrate-the-King (tenor2).mp3',
+        "bass"        : '/christmas/Celebrate-the-King/2-04 Celebrate-the-King (bass2).mp3',
+        "full"        : '/christmas/Celebrate-the-King/Celebrate-the-King.mp3',
+        "vcl_soprano" : '/christmas/Celebrate-the-King/2-01 Celebrate-the-King (vcl_soprano).mp3',
+        "vcl_alto"    : '/christmas/Celebrate-the-King/2-02 Celebrate-the-King (vcl_alto).mp3',
+        "vcl_tenor"   : '/christmas/Celebrate-the-King/2-03 Celebrate-the-King (vcl_tenor).mp3',
+        "vcl_bass"    : '/christmas/Celebrate-the-King/2-04 Celebrate-the-King (vcl_bass).mp3',
+        "vcl_full"    : '/christmas/Celebrate-the-King/2-05 Celebrate-the-King (vcl_full).mp3'
+      };
+      const midiFiles = {
+        soprano: ['/christmas/Celebrate-the-King/Celebrate-the-King.mid',0],
+        alto: ['/christmas/Celebrate-the-King/Celebrate-the-King.mid',1],
+        tenor: ['/christmas/Celebrate-the-King/Celebrate-the-King.mid',2],
+        bass: ['/christmas/Celebrate-the-King/Celebrate-the-King.mid',3],
+        full: ['/christmas/Celebrate-the-King/Celebrate-the-King.mid',[0,1,2,3]]
+      };
+      const ranges = {
+        main: {
             'A':'0.5,53.8',
             'A2':'42,53.8',
             'B':'53.6,84.5',
@@ -18,11 +39,8 @@
             'D':'116,137.2',
             'E':'137,174',
             'F':'174,203'
-         }
-        ],
-        [
-          ["vcl_soprano","vcl_alto","vcl_tenor","vcl_bass","vcl_full"],
-          {
+         },
+        vcl: {
             'A':'0.5,51.7',
             'A2':'40.5,51.7',
             'B':'51.6,80.5',
@@ -31,31 +49,37 @@
             'E':'134,169.9',
             'F':'169.9,197'
           }
-        ]
-      ]
-      function get_trange(seibu,part){
-        tset=t_ranges.find(elm => elm[0].some(item => item==seibu));
-        return tset[1][part];
-      }
-      const num={
-               'soprano':'01',
-               'alto':'02',
-               'tenor':'03',
-               'bass':'04',
-               'vcl_soprano':'01',
-               'vcl_alto':'02',
-               'vcl_tenor':'03',
-               'vcl_bass':'04',
-               'vcl_full':'05'
-              }
-      function get_src(seibu){
-        if(seibu=="full"||seibu==undefined){
-          return src='/christmas/Celebrate-the-King.mp3';
-        }else{
-          return src='/christmas/Celebrate-the-King/2-' + num[seibu] + '%20Celebrate-the-King (' + seibu + ').mp3';
         }
-      }
 		</script>
+	  <style type="text/css">
+      div.audio-container {
+        height: 30px;
+        width: 400px;
+        display: flex;
+        flex-direction: row;
+        align-items: center;
+        margin-bottom: 10px;
+        gap: 5px
+      }
+      span.timeDisplay {
+        width: auto;
+        font-size: 12px;
+        text-wrap: nowrap;
+      }
+      div.segment-btn-container {
+        width: auto;
+        display: block;
+        margin-bottom: 10px;
+      }
+      div.segment-btn-container button {
+        width: auto;
+        height: 1.6em;
+        margin-right: 5px;
+      }
+      li {height: auto;}
+      li div {width: "";}
+    </style>
+
     <title>'Celebrate the King'パート別練習用音源</title>
 	</head>
 	<body>
@@ -67,154 +91,128 @@
   <ul style="list-style: none;">
     <li>
       <div class="part">ソプラノ</div>
-      <audio src='/christmas/Celebrate-the-King/2-01 Celebrate-the-King (soprano).mp3' controls loop preload="none"></audio>
-      &nbsp;&nbsp;<a href='/christmas/Celebrate-the-King/2-01 Celebrate-the-King (soprano).mp3' download><img src='/img/download-m.png'></a>
-      <br>
-      <button onclick="play_repeat('soprano','A',this)">A もろびと、世に下りし御子を</button>
-      <button onclick="play_repeat('soprano','A2',this)">(アレルヤ~平和の君をたたえよ)</button>
-      <button onclick="play_repeat('soprano','B',this)">B みつかいたちの</button>
-      <button onclick="play_repeat('soprano','C',this)">C グローリア</button>
-      <button onclick="play_repeat('soprano','D',this)">D いそぎゆきて</button>
-      <button onclick="play_repeat('soprano','E',this)">E あーたれも聞け</button>
-      <button onclick="play_repeat('soprano','F',this)">F ノエル</button>
-      <button onclick="stop_audio('soprano')">stop</button>
-
+      <div class="audio-container" name="soprano"></div>
+      <div class="segment-btn-container" name="soprano">
+        <button class="playBtn" name='main,A'>A もろびと、世に下りし御子を</button>
+        <button class="playBtn" name='main,A2'>(アレルヤ~平和の君をたたえよ)</button>
+        <button class="playBtn" name='main,B'>B みつかいたちの</button>
+        <button class="playBtn" name='main,C'>C グローリア</button>
+        <button class="playBtn" name='main,D'>D いそぎゆきて</button>
+        <button class="playBtn" name='main,E'>E あーたれも聞け</button>
+        <button class="playBtn" name='main,F'>F ノエル</button>
+      </div>
       <div class="vcl">AI Vocal</div>
-      <audio src='/christmas/Celebrate-the-King/2-01 Celebrate-the-King (vcl_soprano).mp3' controls loop preload="none"></audio>
-      &nbsp;&nbsp;<a href='/christmas/Celebrate-the-King/2-01 Celebrate-the-King (vcl_soprano).mp3' download><img src='/img/download-m.png'></a>
-      <br>
-      <button onclick="play_repeat('vcl_soprano','A',this)">A もろびと、世に下りし御子を</button>
-      <button onclick="play_repeat('vcl_soprano','A2',this)">(アレルヤ~平和の君をたたえよ)</button>
-      <button onclick="play_repeat('vcl_soprano','B',this)">B みつかいたちの</button>
-      <button onclick="play_repeat('vcl_soprano','C',this)">C グローリア</button>
-      <button onclick="play_repeat('vcl_soprano','D',this)">D いそぎゆきて</button>
-      <button onclick="play_repeat('vcl_soprano','E',this)">E あーたれも聞け</button>
-      <button onclick="play_repeat('vcl_soprano','F',this)">F ノエル</button>
-      <button onclick="stop_audio('vcl_soprano')">stop</button>
+      <div class="audio-container" name="vcl_soprano"></div>
+      <div class="segment-btn-container" name="vcl_soprano">
+        <button class="playBtn" name='vcl,A'>A もろびと、世に下りし御子を</button>
+        <button class="playBtn" name='vcl,A2'>(アレルヤ~平和の君をたたえよ)</button>
+        <button class="playBtn" name='vcl,B'>B みつかいたちの</button>
+        <button class="playBtn" name='vcl,C'>C グローリア</button>
+        <button class="playBtn" name='vcl,D'>D いそぎゆきて</button>
+        <button class="playBtn" name='vcl,E'>E あーたれも聞け</button>
+        <button class="playBtn" name='vcl,F'>F ノエル</button>
+      </div>
     </li>
     <li>
       <div class="part">アルト</div>
-      <audio src='/christmas/Celebrate-the-King/2-02 Celebrate-the-King (alto).mp3' controls loop preload="none"></audio>
-      &nbsp;&nbsp;<a href='/christmas/Celebrate-the-King/2-02 Celebrate-the-King (alto).mp3' download><img src='/img/download-m.png'></a>
-      <br>
-      <button onclick="play_repeat('alto','A',this)">A もろびと、世に下りし御子を</button>
-      <button onclick="play_repeat('alto','A2',this)">(アレルヤ~平和の君をたたえよ)</button>
-      <button onclick="play_repeat('alto','B',this)">B みつかいたちの</button>
-      <button onclick="play_repeat('alto','C',this)">C グローリア</button>
-      <button onclick="play_repeat('alto','D',this)">D いそぎゆきて</button>
-      <button onclick="play_repeat('alto','E',this)">E あーたれも聞け</button>
-      <button onclick="play_repeat('alto','F',this)">F ノエル</button>
-      <button onclick="stop_audio('alto')">stop</button>
-
+      <div class="audio-container" name="alto"></div>
+      <div class="segment-btn-container" name="alto">
+        <button class="playBtn" name='main,A'>A もろびと、世に下りし御子を</button>
+        <button class="playBtn" name='main,A2'>(アレルヤ~平和の君をたたえよ)</button>
+        <button class="playBtn" name='main,B'>B みつかいたちの</button>
+        <button class="playBtn" name='main,C'>C グローリア</button>
+        <button class="playBtn" name='main,D'>D いそぎゆきて</button>
+        <button class="playBtn" name='main,E'>E あーたれも聞け</button>
+        <button class="playBtn" name='main,F'>F ノエル</button>
+      </div>
       <div class="vcl">AI Vocal</div>
-      <audio src='/christmas/Celebrate-the-King/2-02 Celebrate-the-King (vcl_alto).mp3' controls loop preload="none"></audio>
-      &nbsp;&nbsp;<a href='/christmas/Celebrate-the-King/2-02 Celebrate-the-King (vcl_alto).mp3' download><img src='/img/download-m.png'></a>
-      <br>
-      <button onclick="play_repeat('vcl_alto','A',this)">A もろびと、世に下りし御子を</button>
-      <button onclick="play_repeat('vcl_alto','A2',this)">(アレルヤ~平和の君をたたえよ)</button>
-      <button onclick="play_repeat('vcl_alto','B',this)">B みつかいたちの</button>
-      <button onclick="play_repeat('vcl_alto','C',this)">C グローリア</button>
-      <button onclick="play_repeat('vcl_alto','D',this)">D いそぎゆきて</button>
-      <button onclick="play_repeat('vcl_alto','E',this)">E あーたれも聞け</button>
-      <button onclick="play_repeat('vcl_alto','F',this)">F ノエル</button>
-      <button onclick="stop_audio('vcl_alto')">stop</button>
+      <div class="audio-container" name="vcl_alto"></div>
+      <div class="segment-btn-container" name="vcl_alto">
+        <button class="playBtn" name='vcl,A'>A もろびと、世に下りし御子を</button>
+        <button class="playBtn" name='vcl,A2'>(アレルヤ~平和の君をたたえよ)</button>
+        <button class="playBtn" name='vcl,B'>B みつかいたちの</button>
+        <button class="playBtn" name='vcl,C'>C グローリア</button>
+        <button class="playBtn" name='vcl,D'>D いそぎゆきて</button>
+        <button class="playBtn" name='vcl,E'>E あーたれも聞け</button>
+        <button class="playBtn" name='vcl,F'>F ノエル</button>
+      </div>
     </li>
     <li>
       <div class="part">テノール</div>
-      <audio src='/christmas/Celebrate-the-King/2-03 Celebrate-the-King (tenor).mp3' controls loop preload="none"></audio>
-      &nbsp;&nbsp;<a href='/christmas/Celebrate-the-King/2-03 Celebrate-the-King (tenor).mp3' download><img src='/img/download-m.png'></a>
-      <br>
-      <button onclick="play_repeat('tenor','A',this)">A もろびと、世に下りし御子を</button>
-      <button onclick="play_repeat('tenor','A2',this)">(アレルヤ~平和の君をたたえよ)</button>
-      <button onclick="play_repeat('tenor','B',this)">B みつかいたちの</button>
-      <button onclick="play_repeat('tenor','C',this)">C グローリア</button>
-      <button onclick="play_repeat('tenor','D',this)">D いそぎゆきて</button>
-      <button onclick="play_repeat('tenor','E',this)">E あーたれも聞け</button>
-      <button onclick="play_repeat('tenor','F',this)">F ノエル</button>
-      <button onclick="stop_audio('tenor')">stop</button>
-
+      <div class="audio-container" name="tenor"></div>
+      <div class="segment-btn-container" name="tenor">
+        <button class="playBtn" name='main,A'>A もろびと、世に下りし御子を</button>
+        <button class="playBtn" name='main,A2'>(アレルヤ~平和の君をたたえよ)</button>
+        <button class="playBtn" name='main,B'>B みつかいたちの</button>
+        <button class="playBtn" name='main,C'>C グローリア</button>
+        <button class="playBtn" name='main,D'>D いそぎゆきて</button>
+        <button class="playBtn" name='main,E'>E あーたれも聞け</button>
+        <button class="playBtn" name='main,F'>F ノエル</button>
+      </div>
       <div class="vcl">AI Vocal</div>
-      <audio src='/christmas/Celebrate-the-King/2-03 Celebrate-the-King (vcl_tenor).mp3' controls loop preload="none"></audio>
-      &nbsp;&nbsp;<a href='/christmas/Celebrate-the-King/2-03 Celebrate-the-King (vcl_tenor).mp3' download><img src='/img/download-m.png'></a>
-      <br>
-      <button onclick="play_repeat('vcl_tenor','A',this)">A もろびと、世に下りし御子を</button>
-      <button onclick="play_repeat('vcl_tenor','A2',this)">(アレルヤ~平和の君をたたえよ)</button>
-      <button onclick="play_repeat('vcl_tenor','B',this)">B みつかいたちの</button>
-      <button onclick="play_repeat('vcl_tenor','C',this)">C グローリア</button>
-      <button onclick="play_repeat('vcl_tenor','D',this)">D いそぎゆきて</button>
-      <button onclick="play_repeat('vcl_tenor','E',this)">E あーたれも聞け</button>
-      <button onclick="play_repeat('vcl_tenor','F',this)">F ノエル</button>
-      <button onclick="stop_audio('vcl_tenor')">stop</button>
-    </li>
-    <li>
-      <div class="part">テノールテスト</div>
-      <div class="vcl">AI Vocal</div>
-      <audio src='https://dl.dropboxusercontent.com/scl/fi/qfuu0o7k8d76typqjebmg/2-03-Celebrate-the-King-vcl_tenor.mp3?rlkey=sb5x6v4rbeajvcbrsi79rt5hl' controls loop preload="none"></audio>
-      <br>
-      <button onclick="play_repeat('vcl_tenor','A',this)">A もろびと、世に下りし御子を</button>
-      <button onclick="play_repeat('vcl_tenor','A2',this)">(アレルヤ~平和の君をたたえよ)</button>
-      <button onclick="play_repeat('vcl_tenor','B',this)">B みつかいたちの</button>
-      <button onclick="play_repeat('vcl_tenor','C',this)">C グローリア</button>
-      <button onclick="play_repeat('vcl_tenor','D',this)">D いそぎゆきて</button>
-      <button onclick="play_repeat('vcl_tenor','E',this)">E あーたれも聞け</button>
-      <button onclick="play_repeat('vcl_tenor','F',this)">F ノエル</button>
-      <button onclick="stop_audio('vcl_tenor')">stop</button>
+      <div class="audio-container" name="vcl_tenor"></div>
+      <div class="segment-btn-container" name="vcl_tenor">
+        <button class="playBtn" name='vcl,A'>A もろびと、世に下りし御子を</button>
+        <button class="playBtn" name='vcl,A2'>(アレルヤ~平和の君をたたえよ)</button>
+        <button class="playBtn" name='vcl,B'>B みつかいたちの</button>
+        <button class="playBtn" name='vcl,C'>C グローリア</button>
+        <button class="playBtn" name='vcl,D'>D いそぎゆきて</button>
+        <button class="playBtn" name='vcl,E'>E あーたれも聞け</button>
+        <button class="playBtn" name='vcl,F'>F ノエル</button>
+      </div>
     </li>
     <li>
       <div class="part">バス</div>
-      <audio src='/christmas/Celebrate-the-King/2-04 Celebrate-the-King (bass).mp3' controls loop preload="none"></audio>
-      &nbsp;&nbsp;<a href='/christmas/Celebrate-the-King/2-04 Celebrate-the-King (bass).mp3' download><img src='/img/download-m.png'></a>
-      <br>
-      <button onclick="play_repeat('bass','A',this)">A もろびと、世に下りし御子を</button>
-      <button onclick="play_repeat('bass','A2',this)">(アレルヤ~平和の君をたたえよ)</button>
-      <button onclick="play_repeat('bass','B',this)">B みつかいたちの</button>
-      <button onclick="play_repeat('bass','C',this)">C グローリア</button>
-      <button onclick="play_repeat('bass','D',this)">D いそぎゆきて</button>
-      <button onclick="play_repeat('bass','E',this)">E あーたれも聞け</button>
-      <button onclick="play_repeat('bass','F',this)">F ノエル</button>
-      <button onclick="stop_audio('bass')">stop</button>
-
+      <div class="audio-container" name="bass"></div>
+      <div class="segment-btn-container" name="bass">
+        <button class="playBtn" name='main,A'>A もろびと、世に下りし御子を</button>
+        <button class="playBtn" name='main,A2'>(アレルヤ~平和の君をたたえよ)</button>
+        <button class="playBtn" name='main,B'>B みつかいたちの</button>
+        <button class="playBtn" name='main,C'>C グローリア</button>
+        <button class="playBtn" name='main,D'>D いそぎゆきて</button>
+        <button class="playBtn" name='main,E'>E あーたれも聞け</button>
+        <button class="playBtn" name='main,F'>F ノエル</button>
+      </div>
       <div class="vcl">AI Vocal</div>
-      <audio src='/christmas/Celebrate-the-King/2-04 Celebrate-the-King (vcl_bass).mp3' controls loop preload="none"></audio>
-      &nbsp;&nbsp;<a href='/christmas/Celebrate-the-King/2-04 Celebrate-the-King (vcl_bass).mp3' download><img src='/img/download-m.png'></a>
-      <br>
-      <button onclick="play_repeat('vcl_bass','A',this)">A もろびと、世に下りし御子を</button>
-      <button onclick="play_repeat('vcl_bass','A2',this)">(アレルヤ~平和の君をたたえよ)</button>
-      <button onclick="play_repeat('vcl_bass','B',this)">B みつかいたちの</button>
-      <button onclick="play_repeat('vcl_bass','C',this)">C グローリア</button>
-      <button onclick="play_repeat('vcl_bass','D',this)">D いそぎゆきて</button>
-      <button onclick="play_repeat('vcl_bass','E',this)">E あーたれも聞け</button>
-      <button onclick="play_repeat('vcl_bass','F',this)">F ノエル</button>
-      <button onclick="stop_audio('vcl_bass')">stop</button>
+      <div class="audio-container" name="vcl_bass"></div>
+      <div class="segment-btn-container" name="vcl_bass">
+        <button class="playBtn" name='vcl,A'>A もろびと、世に下りし御子を</button>
+        <button class="playBtn" name='vcl,A2'>(アレルヤ~平和の君をたたえよ)</button>
+        <button class="playBtn" name='vcl,B'>B みつかいたちの</button>
+        <button class="playBtn" name='vcl,C'>C グローリア</button>
+        <button class="playBtn" name='vcl,D'>D いそぎゆきて</button>
+        <button class="playBtn" name='vcl,E'>E あーたれも聞け</button>
+        <button class="playBtn" name='vcl,F'>F ノエル</button>
+      </div>
     </li>
     <li>
       <div class="part">コーラス</div>
-      <audio src='/christmas/Celebrate-the-King.mp3' controls loop preload="none"></audio>
-      &nbsp;&nbsp;<a href='/christmas/Celebrate-the-King.mp3' download><img src='/img/download-m.png'></a>
-      <br>
-      <button onclick="play_repeat('full','A',this)">A もろびと、世に下りし御子を</button>
-      <button onclick="play_repeat('full','A2',this)">(アレルヤ~平和の君をたたえよ)</button>
-      <button onclick="play_repeat('full','B',this)">B みつかいたちの</button>
-      <button onclick="play_repeat('full','C',this)">C グローリア</button>
-      <button onclick="play_repeat('full','D',this)">D いそぎゆきて</button>
-      <button onclick="play_repeat('full','E',this)">E あーたれも聞け</button>
-      <button onclick="play_repeat('full','F',this)">F ノエル</button>
-      <button onclick="stop_audio('full')">stop</button>
-
+      <div class="audio-container" name="full"></div>
+      <div class="segment-btn-container" name="full">
+        <button class="playBtn" name='main,A'>A もろびと、世に下りし御子を</button>
+        <button class="playBtn" name='main,A2'>(アレルヤ~平和の君をたたえよ)</button>
+        <button class="playBtn" name='main,B'>B みつかいたちの</button>
+        <button class="playBtn" name='main,C'>C グローリア</button>
+        <button class="playBtn" name='main,D'>D いそぎゆきて</button>
+        <button class="playBtn" name='main,E'>E あーたれも聞け</button>
+        <button class="playBtn" name='main,F'>F ノエル</button>
+      </div>
       <div class="vcl">AI Vocal</div>
-      <audio src='/christmas/Celebrate-the-King/2-05 Celebrate-the-King (vcl_full).mp3' controls loop preload="none"></audio>
-      &nbsp;&nbsp;<a href='/christmas/Celebrate-the-King/2-05 Celebrate-the-King (vcl_full).mp3' download><img src='/img/download-m.png'></a>
-      <br>
-      <button onclick="play_repeat('vcl_full','A',this)">A もろびと、世に下りし御子を</button>
-      <button onclick="play_repeat('vcl_full','A2',this)">(アレルヤ~平和の君をたたえよ)</button>
-      <button onclick="play_repeat('vcl_full','B',this)">B みつかいたちの</button>
-      <button onclick="play_repeat('vcl_full','C',this)">C グローリア</button>
-      <button onclick="play_repeat('vcl_full','D',this)">D いそぎゆきて</button>
-      <button onclick="play_repeat('vcl_full','E',this)">E あーたれも聞け</button>
-      <button onclick="play_repeat('vcl_full','F',this)">F ノエル</button>
-      <button onclick="stop_audio('vcl_full')">stop</button>
+      <div class="audio-container" name="vcl_full"></div>
+      <div class="segment-btn-container" name="vcl_full">
+        <button class="playBtn" name='vcl,A'>A もろびと、世に下りし御子を</button>
+        <button class="playBtn" name='vcl,A2'>(アレルヤ~平和の君をたたえよ)</button>
+        <button class="playBtn" name='vcl,B'>B みつかいたちの</button>
+        <button class="playBtn" name='vcl,C'>C グローリア</button>
+        <button class="playBtn" name='vcl,D'>D いそぎゆきて</button>
+        <button class="playBtn" name='vcl,E'>E あーたれも聞け</button>
+        <button class="playBtn" name='vcl,F'>F ノエル</button>
+      </div>
     </li>
   </ul>
+</div>
+<div id="piano-container"></div>
+<div class='nen'>
   <ul style="list-style: none;">
     <li>
       <div class="part"><a href='#' onclick="plus_password('./Celebrate-the-King.pdf')">楽譜</a></div>
@@ -228,5 +226,56 @@
 </div>
 
 </div>
+<script>
+  const svgPiano = new SvgPiano(
+    'piano-container',
+    {
+        min_key_number: 39,
+        number_of_white_keys: 28,
+        white_key_width: 30,
+        white_key_height: 120,
+        black_key_width: 24,
+        black_key_height: 70,
+        volume: 0.5
+    }
+  );
+
+  // パート別に play,pause,stopの各ボタン、seekBar,timeDisplay を作成
+  const audioControls = setAudioControls(".audio-container");
+
+  // audioControlインスタンスに、svgPiano,midiファイル,mp3ファイル等を設定
+  audioControls.forEach(audioControl => {
+    const name = audioControl.options.name;
+    audioControl.update({
+      svgPiano: svgPiano,
+      mp3File: mp3Files[name],
+      midiFile: midiFiles[name.replace('vcl_', '')][0],
+      trackIndex: midiFiles[name.replace('vcl_', '')][1],
+    });
+  });
+
+  document.querySelectorAll(".playBtn").forEach(btn => {
+    btn.addEventListener("click", function() {
+      const name = btn.parentNode.getAttribute("name");
+      //const name = "segment-" + parentName;
+      const [part,segment] = btn.getAttribute("name").split(",");
+      const range = ranges[part][segment];
+      const [start,end] = range.split(",");
+      console.log(`start,end => ${start},${end}`);
+      
+      const audioControl = audioControls.find(control => control.options.name === name );
+      audioControl.update({ segment: range })
+
+      if (Number(start) < audioControl.seekBar.value) {
+        audioControl.playSegment(audioControl.seekBar.value, Number(end));
+      } else {
+        audioControl.playSegment();
+      }
+    });
+  });
+
+  let ac = audioControls.find(control => control.options.name === "soprano" );
+  //alert(ac.options.midiFile);
+</script>
 	</body>
 </html>

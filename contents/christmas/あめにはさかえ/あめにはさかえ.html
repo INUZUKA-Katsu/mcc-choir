@@ -5,42 +5,51 @@
 		<meta name="viewport" content="width=device-width, initial-scale=1.0">
 		<link rel="icon" type="image/png" sizes="16x16" href="/img/favicon.ico">
     <link rel="stylesheet" href="/css/choir.css">
-    <script type="text/javascript" src="/js/get_mp3.js"></script>
-	<script type='text/javascript'>
-	    function get_src(seibu){
-          var part_HMT = {
-            "soprano"     : '/christmas/あめにはさかえ/あめにはさかえ(soprano).mp3',
-            "alto"        : '/christmas/あめにはさかえ/あめにはさかえ(alto).mp3',
-            "tenor"       : '/christmas/あめにはさかえ/あめにはさかえ(tenor).mp3',
-            "bass"        : '/christmas/あめにはさかえ/あめにはさかえ(bass).mp3',
-            "full"        : '/christmas/あめにはさかえ/あめにはさかえ(full).mp3',
-            "vcl_soprano" : '/christmas/あめにはさかえ/あめにはさかえ(vcl_soprano).mp3',
-            "vcl_alto"    : '/christmas/あめにはさかえ/あめにはさかえ(vcl_alto).mp3',
-            "vcl_tenor"   : '/christmas/あめにはさかえ/あめにはさかえ(vcl_tenor).mp3',
-            "vcl_bass"    : '/christmas/あめにはさかえ/あめにはさかえ(vcl_bass).mp3',
-            "vcl_full"    : '/christmas/あめにはさかえ/あめにはさかえ(vcl_full).mp3'
-          };
-          return part_HMT[seibu];
-        }
-        document.addEventListener("DOMContentLoaded", function () {
-          src_set(108);
-        });
-        function src_set(bpm){
-            // オーディオタグをすべて取得
-            document.querySelectorAll("audio").forEach(audio => {
-                // `name`属性を取得（存在しない場合はスキップ）
-                let soundName = audio.getAttribute("name");
-                if (soundName) {
-                    // 音源ファイルのパスを設定
-                    let sourcePath = get_src(soundName);
-                    audio.src = sourcePath;
-                }
-            });
+    <script src="/js/get_mp3.js"></script>
+    <script src="/js/get_information.js"></script>
+    <script src="/js/svgPiano.js"></script>
+    <script src="/js/howler.core.js"></script>
+    <script src="https://unpkg.com/@tonejs/midi"></script>
+	  <script type='text/javascript'>
+        const mp3Files = {
+          "soprano"     : '/christmas/あめにはさかえ/あめにはさかえ(soprano).mp3',
+          "alto"        : '/christmas/あめにはさかえ/あめにはさかえ(alto).mp3',
+          "tenor"       : '/christmas/あめにはさかえ/あめにはさかえ(tenor).mp3',
+          "bass"        : '/christmas/あめにはさかえ/あめにはさかえ(bass).mp3',
+          "full"        : '/christmas/あめにはさかえ/あめにはさかえ(full).mp3',
+          "vcl_soprano" : '/christmas/あめにはさかえ/あめにはさかえ(vcl_soprano).mp3',
+          "vcl_alto"    : '/christmas/あめにはさかえ/あめにはさかえ(vcl_alto).mp3',
+          "vcl_tenor"   : '/christmas/あめにはさかえ/あめにはさかえ(vcl_tenor).mp3',
+          "vcl_bass"    : '/christmas/あめにはさかえ/あめにはさかえ(vcl_bass).mp3',
+          "vcl_full"    : '/christmas/あめにはさかえ/あめにはさかえ(vcl_full).mp3'
+        };
+        const midiFiles = {
+          soprano: ['/christmas/あめにはさかえ/あめにはさかえ.mid', 0],
+          alto: ['/christmas/あめにはさかえ/あめにはさかえ.mid', 1],
+          tenor: ['/christmas/あめにはさかえ/あめにはさかえ.mid', 2],
+          bass: ['/christmas/あめにはさかえ/あめにはさかえ.mid', 3],
+          full: ['/christmas/あめにはさかえ/あめにはさかえ.mid', null]
         }
 	</script>
 	<style type="text/css">
-	</style>
-    <title>'あめにはさかえ'パート別練習用音源</title>
+      div.audio-container {
+        height: 30px;
+        width: 400px;
+        display: flex;
+        flex-direction: row;
+        align-items: center;
+        margin-bottom: 10px;
+        gap: 5px
+      }
+      span.timeDisplay {
+        width: auto;
+        font-size: 12px;
+        text-wrap: nowrap;
+      }
+      li {height: 120px;}
+      li div {width: "";}
+  </style>
+  <title>'あめにはさかえ'パート別練習用音源</title>
 	</head>
 	<body>
 <div class='body'>
@@ -51,40 +60,36 @@
   <ul style="list-style: none;">
     <li>
       <div class="part">ソプラノ</div>
-      <audio name="soprano" controls preload="none" loop></audio>
-      <br>
+      <div class="audio-container" name="soprano"></div>
       <div class="vcl">AI Vocal</div>
-      <audio name="vcl_soprano" controls preload="none" loop></audio>
+      <div class="audio-container" name="vcl_soprano"></div>
     </li>
     <li>
       <div class="part">アルト</div>
-      <audio name="alto" controls preload="none" loop></audio>
-      <br>
+      <div class="audio-container" name="alto"></div>
       <div class="vcl">AI Vocal</div>
-      <audio name="vcl_alto" controls preload="none" loop></audio>
+      <div class="audio-container" name="vcl_alto"></div>
     </li>
     <li>
       <div class="part">テノール</div>
-      <audio name="tenor" controls preload="none" loop></audio>
-      <br>
+      <div class="audio-container" name="tenor"></div>
       <div class="vcl">AI Vocal</div>
-      <audio name="vcl_tenor" controls preload="none" loop></audio>
+      <div class="audio-container" name="vcl_tenor"></div>
     </li>
     <li>
       <div class="part">バス</div>
-      <audio name="bass" controls preload="none" loop></audio>
-      <br>
+      <div class="audio-container" name="bass"></div>
       <div class="vcl">AI Vocal</div>
-      <audio name="vcl_bass" controls preload="none" loop></audio>
+      <div class="audio-container" name="vcl_bass"></div>
     <li>
       <div class="part">コーラス</div>
-      <audio name="full" controls preload="none" loop></audio>
-      <br>
+      <div class="audio-container" name="full"></div>
       <div class="vcl">AI Vocal</div>
-      <audio name="vcl_full" controls preload="none" loop></audio>
+      <div class="audio-container" name="vcl_full"></div>
     </li>
   </ul>
 </div>
+<div id="piano-container"></div>
 <div class="words">
 </div>
 <br>
@@ -110,5 +115,35 @@
   <a href='/mcc/index.html'>⇒ MCCワーシップクワイアーの持ち歌のページに戻る.</a>
 </div>
 </div>
+
+
+<script>
+  const svgPiano = new SvgPiano(
+    'piano-container',
+    {
+        min_key_number: 39,
+        number_of_white_keys: 22,
+        white_key_width: 30,
+        white_key_height: 120,
+        black_key_width: 24,
+        black_key_height: 70,
+        volume: 0.5
+    }
+  );
+
+  // パート別に play,pause,stopの各ボタン、seekBar,timeDisplay を作成
+  const audioControls = setAudioControls(".audio-container");
+
+  // audioControlインスタンスに、svgPiano,midiファイル,mp3ファイル等を設定
+  audioControls.forEach(audioControl => {
+    const name = audioControl.options.name;
+    audioControl.update({
+      svgPiano: svgPiano,
+      mp3File: mp3Files[name],
+      midiFile: midiFiles[name.replace('vcl_', '')][0],
+      trackIndex: midiFiles[name.replace('vcl_', '')][1],
+    });
+  });
+</script>
 	</body>
 </html>
