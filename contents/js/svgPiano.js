@@ -366,13 +366,15 @@ function setAudioControls(containerClassName){
 }
 
 class MidiPlayer {
-    constructor(svgPiano, midiFile, trackIndex = null){
-      this.scheduledTimeouts = [];
+    constructor(svgPiano, midiFile, OFFSET = 0, midiSegment = null, trackIndex = null){
       this.piano = svgPiano;
+      this.loadingPromise = this.loadMidi(midiFile);
+      this.OFFSET = OFFSET; // mp3冒頭の無音時間(秒)
+      this.midiSegment = midiSegment; // MIDIセグメント
       this.trackIndex = trackIndex;
+      this.scheduledTimeouts = [];
       this.isLoaded = false;
       this.midi = null;
-      this.loadingPromise = this.loadMidi(midiFile);
     }
     
     async loadMidi(midiFile) {
@@ -384,46 +386,69 @@ class MidiPlayer {
       console.dir(this.midi.tracks);
       this.isLoaded = true;
     }
-  
+
     // ========= MIDIハイライトのスケジューリングメソッド =========
-    // 引数pianoはSvgPianoクラスのインスタンス
+    //引数pianoはSvgPianoクラスのインスタンス
     async scheduleMidHeighlight(seekPosition) {
       console.trace();
       await this.loadingPromise; // MIDIファイルが読み込まれるのを待つ
       
+      console.log("scheduleMidHeighlight:step1");
+
       this.scheduledTimeouts.forEach(clearTimeout);
       this.scheduledTimeouts = [];
+      this.resetAllKeys();
       
+      console.log("scheduleMidHeighlight:step2");
+      const start = this.midiSegment[0];
+      const duration = this.midiSegment[1];
+      const end = start + duration;
+      const offset = this.OFFSET;
+
+      console.log("scheduleMidHeighlight:step3");
+
       const trackIndices = this.convertedTrackIndex();
       const tracksToProcess =
         this.trackIndex === null
           ? this.midi.tracks
           : this.midi.tracks.filter((_, i) => trackIndices.includes(i));
 
+      console.log("scheduleMidHeighlight:step4");
+        
       tracksToProcess.forEach(track => {
         track.notes.forEach(note => {
-          const heighlightDelay = (note.time - seekPosition) * 1000;
-          const resetDelay = (note.time + note.duration - seekPosition) * 1000;  
-          if (heighlightDelay >= 0) {
-            const t1 = setTimeout(
-              () => this.highlightKey(note.midi),
-              heighlightDelay
-            );
-            this.scheduledTimeouts.push(t1);
-          }
-          if (resetDelay >= 0) {
-            const t2 = setTimeout(
-              () => this.resetKey(note.midi),
-              resetDelay
-            );
-            this.scheduledTimeouts.push(t2);
+          console.log(`note.time < start: ${note.time} < ${start}`);
+          // MIDIセグメント外のノートはスキップ
+          if (note.time  < start || note.time > end) return;
+
+          const relStart = note.time - start + offset;
+          const relEnd = relStart + note.duration;
+          
+          const heighlightDelay = (relStart - seekPosition) * 1000;
+          const resetDelay = (relEnd - seekPosition) * 1000;  
+          
+          console.log(`note.midi:${note.midi}、heighlightDelay:${heighlightDelay}`);
+
+          if (relStart >= seekPosition) {
+
+            const startTimer = setTimeout(() => this.highlightKey(note.midi),heighlightDelay);
+            const endTimer = setTimeout(() => this.resetKey(note.midi),resetDelay);
+            this.scheduledTimeouts.push(startTimer,endTimer);
+
+          } else if ( relStart < seekPosition && relEnd > seekPosition) {
+            const remaining = (relEnd - seekPosition) *1000;             
+            this.highlightKey(note.midi);
+            const endTimer2 = setTimeout(() => this.resetKey(note.midi),remaining);
+            this.scheduledTimeouts.push(endTimer2);
           }
         });
       });
     }
 
     clearScheduledTimeouts() {
-      this.scheduledTimeouts.forEach(clearTimeout);
+      if (this.scheduledTimeouts) {
+        this.scheduledTimeouts.forEach(t => clearTimeout(t));
+      }
       this.scheduledTimeouts = [];
     }
     
@@ -491,32 +516,82 @@ class MidiPlayer {
         mp3File: null,
         midiFile: null,
         trackIndex: null,
+        OFFSET: 0, // mp3冒頭の無音時間(秒)
+        midiStart: 0, // mp3に対応するMIDIの開始時間(秒)
         segment: null,
         loop: false,
+        // 複数ファイルセット用の拡張機能
+        fileSets: [],
+        currentFileSetIndex: 0,
+        preloadedSets: [],
         ...controls,
       }
+
+      // 初期化時に初期セットをfileSets[0]に格納
+      this.initializeInitialFileSet();
+
+      console.log(`this.options.midiStart:${this.options.midiStart}`);
       this.playBtn = document.getElementById(this.options.playBtn);
       this.pauseBtn = document.getElementById(this.options.pauseBtn);
       this.stopBtn = document.getElementById(this.options.stopBtn);
       this.seekBar = document.getElementById(this.options.seekBar);
       this.timeDisplay = document.getElementById(this.options.timeDisplay);
-      this.midi = null;
+      
       this.howl = null;
+      this.sound = null;
+      this.midiPlayer = null;
       this.seekTimer = null;
       this.isDragging = false;
-      this.midiPlayer = null;
       this.isPlaying = false;
+      this.loopTimer = null;
+
+      this.midi = null;
+      this.midiSegment = null;
+
+      // 拡張用プロパティ
+      this.additionalSounds = [];
+      this.additionalMidiPlayers = [];
+
       this.init();
     }
 
-    init() {
-      if (this.options.midiFile) {
-        this.setupMidiPlayer();
-      }
+    // 初期セットをfileSets[0]に格納
+    initializeInitialFileSet() {
+      const initialFileSet = {
+        mp3File: this.options.mp3File,
+        midiFile: this.options.midiFile,
+        trackIndex: this.options.trackIndex,
+        OFFSET: this.options.OFFSET,
+        midiStart: this.options.midiStart,
+        segment: this.options.segment,
+        name: 'Original'
+      };
+      
+      this.options.fileSets.push(initialFileSet);
+      
+      // 初期セット用のプリロード情報も作成
+      const initialPreloadedSet = {
+        index: 0,
+        sound: null,
+        midiPlayer: null,
+        isLoaded: false
+      };
+      
+      this.options.preloadedSets.push(initialPreloadedSet);
+    }
+
+    async init() {
       if (this.options.mp3File) {
-        this.setupMp3P();
+        this.setupMp3();
       }
-      if (this.playBtn) this.playBtn.addEventListener('click', () => this.play());
+      if (this.playBtn) this.playBtn.addEventListener('click', () => {
+        if (this.seekBar.value == 0 && this.options.currentFileSetIndex !== 0) {
+          this.switchFileSet('Original');
+          this.seekBar.max = this.sound.duration();
+          this.updateTimeDisplay();
+        }
+        this.play()
+      });
       if (this.pauseBtn) this.pauseBtn.addEventListener('click', () => this.pause());
       if (this.stopBtn) this.stopBtn.addEventListener('click', () => this.stop());
       if (this.seekBar) this.seekBar.addEventListener('input', () => this.seek());
@@ -531,20 +606,143 @@ class MidiPlayer {
         this.seekBar.addEventListener('change', () => this.endSeek());
       }
     }
-    setupMidiPlayer() {
-      this.midiPlayer = new MidiPlayer(
-        this.options.svgPiano, 
-        this.options.midiFile, 
-        this.options.trackIndex
-      );      
+
+    //　追加のファイルセットを動的に追加
+    async addFileSet(fileSet) {
+      console.warn(`addFileSet開始:${fileSet.name}`);
+      const index = this.options.fileSets.length;
+      this.options.fileSets.push(fileSet);
+      const preloadedSet = {
+        index: index,
+        name: fileSet.name,
+        sound: null,
+        midiPlayer: null,
+        isLoaded: false
+      };
+
+      if (fileSet.mp3File) {
+        preloadedSet.sound = new Howl({
+          src: [fileSet.mp3File],
+          html5: false,
+          preload: true,
+          onload: () => {
+            console.log(`File set:${preloadedSet.name}:${fileSet.mp3File} MP3 loaded`);
+            preloadedSet.isLoaded = true;
+          },
+          onplay: () => {
+            this.seekTimer = setInterval(() => {
+              if (!this.isDragging) this.seekBar.value = preloadedSet.sound.seek();
+              this.updateTimeDisplay();
+            }, 100);
+          },
+          onpause: () => { 
+            clearInterval(this.seekTimer); 
+          },
+          onstop: () => { 
+            clearInterval(this.seekTimer);  
+            this.seekBar.value = 0;
+            this.updateTimeDisplay();
+          },
+          onloaderror: () => {
+            console.error(`File set:${index} MP3 loading failed`);
+          },
+        });
+        this.additionalSounds.push(preloadedSet.sound);
+      }
+
+      if (fileSet.midiFile && this.options.svgPiano) {
+        preloadedSet.midiPlayer = new MidiPlayer(
+          this.options.svgPiano, 
+          fileSet.midiFile,
+          fileSet.OFFSET,
+          null,
+          fileSet.trackIndex,
+        );
+        this.additionalMidiPlayers.push(preloadedSet.midiPlayer);
+      }
+
+      this.options.preloadedSets.push(preloadedSet);
+
+      return index ;  // 追加したファイルセットのインデックスを返す
     }
-    setupMp3P() {
+
+    // ファイルセットを切り替える
+    switchFileSet(name) {
+      let index;
+      if (name === 'Original'){
+        index = 0;
+        this.currentSound = this.sound;
+        this.currentMidiPlayer = this.midiPlayer;
+        this.seekBar.max = this.sound.duration();
+      } else {
+        index = this.options.fileSets.findIndex(set => set.name === name);
+        const preloadedSet = this.options.preloadedSets.find(set => set.index === index);
+        if (preloadedSet && preloadedSet.isLoaded) {
+          this.currentSound = preloadedSet.sound;
+          this.currentMidiPlayer = preloadedSet.midiPlayer;
+          this.seekBar.max = this.currentSound.duration();
+
+          if (this.currentMidiPlayer && this.currentSound) {
+            const fileSet = this.options.fileSets[index];
+            this.currentMidiPlayer.midiSegment = [
+              fileSet.midiStart || 0,
+              this.currentSound.duration() ,
+            ];
+          }
+        } else {
+          console.warn(`File set:${name} is not loaded yet`);
+          return;
+        }
+      }
+      const [start, duration] = this.currentMidiPlayer.midiSegment;
+      console.warn(`switchFileSet:${name} midi.Start:${start}, duration:${duration}`);
+      this.options.currentFileSetIndex = index;
+      this.stop();
+
+      // シークバーの最大値を更新
+      if (this.currentSound) {
+        this.seekBar.max = this.currentSound.duration();
+        this.updateTimeDisplay();
+      }
+    }
+
+    // 現在のファイルセット情報を取得
+    getCurrentFileSet() {
+      if (this.options.currentFileSetIndex === 0) {
+        return {
+          mp3File: this.options.mp3File,
+          midiFile: this.options.midiFile,
+          trackIndex: this.options.trackIndex,
+          OFFSET: this.options.OFFSET,
+          midiStart: this.options.midiStart,
+          segment: this.options.segment
+        };
+      } else {
+        return this.options.fileSets[this.options.currentFileSetIndex];
+      }
+    }
+
+    // ファイルセットの総数を取得
+    getFileSetCount() {
+      return this.options.fileSets.length;
+    }
+
+    // MP3ファイルをセットアップ
+    async setupMp3() {
+      console.warn("setupMp3開始");
       this.sound = new Howl({
         src: [this.options.mp3File],
         html5: false,
         onload: () => { 
           this.seekBar.max = this.sound.duration(); 
           this.updateTimeDisplay();
+
+          this.options.preloadedSets[0].sound = this.sound;
+          this.options.preloadedSets[0].isLoaded = true;
+
+          if (this.options.midiFile) {
+            this.setupMidiPlayer();
+          }
         },
         onplay: () => {
           this.seekTimer = setInterval(() => {
@@ -559,93 +757,121 @@ class MidiPlayer {
           clearInterval(this.seekTimer);  
           this.seekBar.value = 0;
           this.updateTimeDisplay();
-        },
-        onend: () => { 
-          clearInterval(this.seekTimer);  
-          this.seekBar.value = 0;
-          this.updateTimeDisplay();
         }
       });
+      this.currentSound = this.sound;
     }
+
+    setupMidiPlayer() {
+      console.warn("setupMidiPlayer開始");
+      this.midiSegment = [this.options.midiStart, this.sound.duration()];
+      console.log(`this.midiSegment[0]:${this.midiSegment[0]} @setupMidiPlayer`);
+      console.log(`this.midiSegment[1]:${this.midiSegment[1]} @setupMidiPlayer`);
+      this.midiPlayer = new MidiPlayer(
+        this.options.svgPiano, 
+        this.options.midiFile, 
+        this.options.OFFSET,
+        this.midiSegment,
+        this.options.trackIndex,
+      );
+      this.options.preloadedSets[0].midiPlayer = this.midiPlayer;
+      this.currentMidiPlayer = this.midiPlayer;
+    }
+
     update(newOptions){
+      console.warn("update開始");
       this.options = {
         ...this.options,
         ...newOptions
       }
-      if (Object.keys(newOptions).includes('midiFile')) {
+      console.log(`this.options.midiStart:${this.options.midiStart} @update`);
+      if (Object.keys(newOptions).includes('mp3File')) {
+        this.setupMp3();
+      }else if (Object.keys(newOptions).includes('midiFile')) {
+        this.setupMidiPlayer();
+      } else if (Object.keys(newOptions).includes('midiStart')) {
+        this.midiSegment = [this.options.midiStart, this.sound.duration()];
         this.setupMidiPlayer();
       }
-      if (Object.keys(newOptions).includes('mp3File')) {
-        this.setupMp3P();
-      }
     }
-      
     play() {
       if (this.isPlaying) {
         this.stop();
         setTimeout(() => {
-          this.sound.seek(0);
-          this.play();
-        },1000);
-        return
+          if (this.currentSound) {
+            this.currentSound.seek(0);
+            this.play();
+          }
+        }, 1000);
+        return;
+      }
+      
+      if (!this.currentSound) {
+        console.warn("No sound loaded");
+        return;
       }
       this.stopOtherAudio();
+
+      // 既存のendイベントリスナーを削除
+      this.currentSound.off('end');
+      
       this.scheduleMidHighlight(this.seekBar.value);
-      this.sound.seek(this.seekBar.value); //pauseしている場合はpause位置からスタート
-      this.sound.play();
+      this.currentSound.seek(this.seekBar.value);
+      this.currentSound.play();
+
       this.isPlaying = true;
+      
       // ループ再生（鍵盤ハイライトもループ）
       if (this.options.loop) {
-        this.sound.on('end', () => {
+        this.currentSound.on('end', () => {
+          clearInterval(this.seekTimer);
+          this.seekBar.value = 0;
+          this.updateTimeDisplay();
           setTimeout(() => {
-            this.seekBar.value = 0;
-            this.sound.seek(0);
+            this.currentSound.seek(0);
             this.play();
-          }, 1500);
+          }, 2000);
         });
       }
     }
-
-    // 指定された時間区間を再生
+    
     playSegment(start, end) {
       if (this.isPlaying) {
         this.stop();
         setTimeout(() => {
-          this.sound.seek(0);
-          this.playSegment();
-        },1000);
-        return
+          if (this.currentSound) {
+            this.currentSound.seek(0);
+            this.playSegment();
+          }
+        }, 1000);
+        return;
       }
+      
       this.stopOtherAudio();
-      console.log(`this.options.segment => ${this.options.segment}`);
+      
+      // セグメントの処理（既存のコード）
       const [options_start, options_end] = this.options.segment.split(",");
       if (start === undefined && end === undefined && this.options.segment) {
-        console.log("rout1 @playSegment");
-        [start, end] = [ Number(options_start), Number(options_end) ];
-        if (start < this.seekBar.value && this.seekBar.value < end) start = this.seekBar.value; //pauseからの再開の場合
+        [start, end] = [Number(options_start), Number(options_end)];
+        if (start < this.seekBar.value && this.seekBar.value < end) start = this.seekBar.value;
       
       } else if (start !== undefined && end === undefined && this.options.segment) {
-        console.log("rout2 @playSegment");
-        [start, end] = [ Number(start), Number(options_end)] ;
+        [start, end] = [Number(start), Number(options_end)];
       
       } else if (start !== undefined && end !== undefined) {
-        console.log("rout3 @playSegment");
-        [start, end] = [ Number(start), Number(end)] ;
+        [start, end] = [Number(start), Number(end)];
       }
-      console.log(`start, end => ${start},${end}`);
-
+      
       // 再生開始位置をstart秒に設定
-      this.sound.seek(start);
+      this.currentSound.seek(start);
+      this.scheduleMidHighlight(start);
       
       // 再生開始
-      this.scheduleMidHighlight(start);
-      console.log("ハイライトスケジュール完了");
-      this.sound.play();
-      console.log("再生開始");
+      this.currentSound.play();
       this.isPlaying = true;
       
       // end秒で再生を停止
-      const duration = (end - start) * 1000; // ミリ秒に変換
+      const duration = (end - start) * 1000;
       this.loopTimer = setTimeout(() => {
         this.stop();
         if (this.options.loop) {
@@ -656,14 +882,94 @@ class MidiPlayer {
       }, duration);
     }
     
+    //play() {
+    //  if (this.isPlaying) {
+    //    this.stop();
+    //    setTimeout(() => {
+    //      this.sound.seek(0);
+    //      this.play();
+    //    },1000);
+    //    return
+    //  }
+    //  this.stopOtherAudio();
+    //  this.scheduleMidHighlight(this.seekBar.value);
+    //  this.sound.seek(this.seekBar.value); //pauseしている場合はpause位置からスタート
+    //  this.sound.play();
+    //  this.isPlaying = true;
+    //  // ループ再生（鍵盤ハイライトもループ）
+    //  if (this.options.loop) {
+    //    this.sound.on('end', () => {
+    //      setTimeout(() => {
+    //        this.seekBar.value = 0;
+    //        this.sound.seek(0);
+    //        this.play();
+    //      }, 1500);
+    //    });
+    //  }
+    //}
+
+    // 指定された時間区間を再生
+    //playSegment(start, end) {
+    //  if (this.isPlaying) {
+    //    this.stop();
+    //    setTimeout(() => {
+    //      this.sound.seek(0);
+    //      this.playSegment();
+    //    },1000);
+    //    return
+    //  }
+    //  this.stopOtherAudio();
+    //  console.log(`this.options.segment => ${this.options.segment}`);
+    //  const [options_start, options_end] = this.options.segment.split(",");
+    //  if (start === undefined && end === undefined && this.options.segment) {
+    //    console.log("rout1 @playSegment");
+    //    [start, end] = [ Number(options_start), Number(options_end) ];
+    //    if (start < this.seekBar.value && this.seekBar.value < end) start = this.seekBar.value; //pauseからの再開の場合
+    //  
+    //  } else if (start !== undefined && end === undefined && this.options.segment) {
+    //    console.log("rout2 @playSegment");
+    //    [start, end] = [ Number(start), Number(options_end)] ;
+    //  
+    //  } else if (start !== undefined && end !== undefined) {
+    //    console.log("rout3 @playSegment");
+    //    [start, end] = [ Number(start), Number(end)] ;
+    //  }
+    //  console.log(`start, end => ${start},${end}`);
+    //
+    //  // 再生開始位置をstart秒に設定
+    //  this.sound.seek(start);
+    //  
+    //  // 再生開始
+    //  this.scheduleMidHighlight(start);
+    //  console.log("ハイライトスケジュール完了");
+    //  this.sound.play();
+    //  console.log("再生開始");
+    //  this.isPlaying = true;
+    //  
+    //  // end秒で再生を停止
+    //  const duration = (end - start) * 1000; // ミリ秒に変換
+    //  this.loopTimer = setTimeout(() => {
+    //    this.stop();
+    //    if (this.options.loop) {
+    //      setTimeout(() => {
+    //        this.playSegment();
+    //      }, 1500);
+    //    }
+    //  }, duration);
+    //}
+    
     pause() {
-      this.sound.pause();
+      if (this.currentSound) {
+        this.currentSound.pause();
+      }
       this.clearScheduledTimeouts();
       this.isPlaying = false;
     }
-    
+
     stop() {
-      this.sound.stop();
+      if (this.currentSound) {
+        this.currentSound.stop();
+      }
       this.isPlaying = false;
       this.clearScheduledTimeouts();
       this.resetAllKeys();
@@ -674,7 +980,9 @@ class MidiPlayer {
       
     seek() {
       this.isDragging = true;
-      this.sound.seek(this.seekBar.value);
+      if (this.currentSound) {
+        this.currentSound.seek(this.seekBar.value);
+      }
       this.clearScheduledTimeouts();
       this.resetAllKeys();
       this.isPlaying = false;
@@ -682,22 +990,30 @@ class MidiPlayer {
     }
     
     endSeek() {
-      this.seekBar.value = this.sound.seek();
+      if (this.currentSound) {
+        this.seekBar.value = this.currentSound.seek();
+      }
       this.isDragging = false;
-      this.scheduleMidHighlight(this.seekBar.value);
+      //this.scheduleMidHighlight(this.seekBar.value);
       this.updateTimeDisplay();
     }
     
     scheduleMidHighlight(currentTime) {
-      this.midiPlayer.scheduleMidHeighlight(currentTime);
+      if (this.currentMidiPlayer) {
+        this.currentMidiPlayer.scheduleMidHeighlight(currentTime);
+      }
     }
     
     clearScheduledTimeouts() {
-      this.midiPlayer.clearScheduledTimeouts();
+      if (this.currentMidiPlayer) {
+        this.currentMidiPlayer.clearScheduledTimeouts();
+      }
     }
 
     resetAllKeys() {
-      this.midiPlayer.resetAllKeys();
+      if (this.currentMidiPlayer) {
+        this.currentMidiPlayer.resetAllKeys();
+      }
     }
 
     stopOtherAudio() {
@@ -720,10 +1036,10 @@ class MidiPlayer {
   
     // 時間表示を更新する関数
     updateTimeDisplay() {
-      if (!this.timeDisplay) return;
+      if (!this.timeDisplay || !this.currentSound) return;
       
-      const currentTime = this.sound ? this.sound.seek() : 0;
-      const duration = this.sound ? this.sound.duration() : 0;
+      const currentTime = this.currentSound.seek();
+      const duration = this.currentSound.duration();
       
       const currentFormatted = this.formatTime(currentTime);
       const durationFormatted = this.formatTime(duration);
