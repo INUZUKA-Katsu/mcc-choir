@@ -5,18 +5,19 @@
 		<meta name="viewport" content="width=device-width, initial-scale=1.0">
 		<link rel="icon" type="image/png" sizes="16x16" href="/img/favicon.ico">
     <link rel="stylesheet" href="/css/choir.css">
+    <script src="/js/howler.core.js"></script>
+    <script src="https://unpkg.com/@tonejs/midi"></script>
+    <script src="https://unpkg.com/tone@latest/build/Tone.js"></script>
     <script src="/js/get_mp3.js"></script>
     <script src="/js/get_information.js"></script>
     <script src="/js/svgPiano.js"></script>
-    <script src="/js/howler.core.js"></script>
-    <script src="https://unpkg.com/@tonejs/midi"></script>
-		<script type='text/javascript'>
+    <script type='text/javascript'>
       const mp3Files = {
-        soprano : '/easter/chichinonamida/01 chichinonamida(soprano).mp3',
-        alto    : '/easter/chichinonamida/02 chichinonamida(alto).mp3',
-        tenor   : '/easter/chichinonamida/03 chichinonamida(tenor).mp3',
+        soprano : ['/easter/chichinonamida/01 chichinonamida(soprano).mp3',1.98],
+        alto    : ['/easter/chichinonamida/02 chichinonamida(alto).mp3',1.98],
+        tenor   : ['/easter/chichinonamida/03 chichinonamida(tenor).mp3',1.98],
         bass    : '/easter/chichinonamida/04 chichinonamida(bass).mp3',
-        full    : '/easter/chichinonamida/chichinonamida.mp3',
+        full    : '/easter/chichinonamida.mp3',
         seg_soprano : '/easter/chichinonamida/愛するひとり子を十字架につけた(HMT,soprano).mp3',
         seg_alto    : '/easter/chichinonamida/愛するひとり子を十字架につけた(HMT,alto).mp3',
         seg_tenor   : '/easter/chichinonamida/愛するひとり子を十字架につけた(HMT,tenor).mp3',
@@ -224,11 +225,20 @@
   // audioControlインスタンスに、svgPiano,midiファイル,mp3ファイル等を設定
   audioControls.forEach(audioControl => {
     const name = audioControl.options.name;
+    let mp3File, OFFSET;
+    if (Array.isArray(mp3Files[name])) {
+      mp3File = mp3Files[name][0];
+      OFFSET = mp3Files[name][1];
+    } else {
+      mp3File = mp3Files[name];
+      OFFSET = 0;
+    }
     audioControl.update({
       svgPiano: svgPiano,
-      mp3File: mp3Files[name],
+      mp3File: mp3File,
       midiFile: midiFiles[name][0],
       trackIndex: midiFiles[name][1],
+      OFFSET: OFFSET,
     });
   });
       </script>

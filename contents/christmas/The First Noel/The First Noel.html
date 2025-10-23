@@ -331,8 +331,10 @@
       const range = ranges(nameWithTempo,segment);
       const [start,end] = range.split(",");      
       console.log(`start,end => ${start},${end}`);
+      
       const audioControl = audioControls.find(control => control.options.name === commonName );
       audioControl.update({ segment: range })
+      
       if (Number(start) < audioControl.seekBar.value) {
         console.log(`audioControl.seekBar.value => ${audioControl.seekBar.value}`);
         audioControl.playSegment(audioControl.seekBar.value,Number(end));
