@@ -43,13 +43,10 @@ class Choir
         pass = data["password"]
         p pass
         if password_check(pass)
-          p :rout1
           t = Time.now
           day = "#{t.month.to_s}月#{t.day.to_s}日"
           header["content-type"] = "text/plain;charset=utf-8"
-          p :rout2
           response = day + "\n" + data["info"] + "\n\n" + get_information(path)
-          p :rout3
           update_information(response,path)
         else
           header["content-type"] = 'text/plain;charset=utf-8'
@@ -73,9 +70,13 @@ class Choir
         p :rout_when_html
         html_path = File.join("./contents",path)
         html = File.read(html_path)
+        # 自動リフレッシュ用のスクリプトを挿入する。
         if ENV['RACK_ENV']=="development"
           html = insert_livereload_script(html)
         end
+        # jsファイルにキャッシュが効かないように日時を付加する。
+        html = add_date_to_jsurl(html)
+        # バックエンドで音源ファイルを調べ、ない場合は、自動でダウンロードする。
         Thread.new do
           load_missing_mp3_in_background(html)
         end
@@ -91,7 +92,6 @@ class Choir
         STDOUT.puts "path => #{path}"
         tmp_file = File.join("./tmp",path)
         STDOUT.puts "tmp_file => #{tmp_file}"
-        STDOUT.puts "File.size(tmp_file) => #{File.size(tmp_file)}"
         header = header_of_binary_data(path)
         if File.exist?(tmp_file) and File.size(tmp_file) > 0
           p "File.exist? #{File.exist? tmp_file}: #{tmp_file}"
@@ -255,16 +255,19 @@ class Choir
   end
   def load_missing_mp3_in_background(html)
     html.scan(/[^"']+\.mp3/).each do |path|
-      STDOUT.puts "path => #{path}"
+      STDOUT.puts "path => #{path} @load_missing_mp3_in_background"
+
       #直接 Dropbpx へのリンクが書かれている場合はスキップ
       next if path.match(/^https:\/\/dl\.dropboxusercontent\.com/i)
+      
       dest_path = File.join("./tmp", path)
-      STDOUT.puts "dest_path => #{dest_path}"
+      STDOUT.puts "dest_path => #{dest_path} @load_missing_mp3_in_background"
+      
       unless File.exist?(dest_path)
         src_path = File.join("/mp3", path)
         contents = get_from_dropbox(src_path)
         write_binary_data(dest_path,contents)
-        STDOUT.puts "loaded #{dest_path}"
+        STDOUT.puts "loaded #{dest_path} @load_missing_mp3_in_background"
       end
     end
   end
@@ -419,5 +422,11 @@ EOS
   end
   def insert_livereload_script(html)
     return html.sub(/<\/body>/, "<script src=\"http://localhost:35729/livereload.js?snipver=1\"></script>\n</body>")
+  end
+  def add_date_to_jsurl(html)
+    #常に最新ファイルを読み込ませるため.
+    return html.gsub(/(<script src=["']\/js\/[^\/]+\.js)(["']><\/script>)/i){
+      $1 + "?#{Time.now.strftime("%m%d%H%M")}" + $2
+    } 
   end
 end
