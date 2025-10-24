@@ -494,11 +494,11 @@ class MidiPlayer {
           tracktable.push(i);
         }
       }
-      console.log(tracktable);
+      console.warn(tracktable);
       for (let i = 0; i < trackIndex.length; i++) {
         converted.push(tracktable[trackIndex[i]]);
       }
-      console.log(`${this.trackIndex} ⇒ convertedTrackIndex: ${converted}`);
+      console.warn(`${this.trackIndex} ⇒ convertedTrackIndex: ${converted}`);
       return converted;
     }
   }
@@ -730,6 +730,7 @@ class MidiPlayer {
     // MP3ファイルをセットアップ
     async setupMp3() {
       console.warn("setupMp3開始");
+      console.warn(`this.options.mp3File:${this.options.mp3File}`);
       this.sound = new Howl({
         src: [this.options.mp3File],
         html5: false,
@@ -763,7 +764,7 @@ class MidiPlayer {
     }
 
     setupMidiPlayer() {
-      console.warn("setupMidiPlayer開始");
+      console.warn(`setupMidiPlayer開始: from setupMp3:${this.options.mp3File}`);
       this.midiSegment = [this.options.midiStart, this.sound.duration()];
       console.log(`this.midiSegment[0]:${this.midiSegment[0]} @setupMidiPlayer`);
       console.log(`this.midiSegment[1]:${this.midiSegment[1]} @setupMidiPlayer`);
