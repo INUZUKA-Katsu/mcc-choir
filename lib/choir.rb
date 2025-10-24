@@ -91,8 +91,9 @@ class Choir
         STDOUT.puts "path => #{path}"
         tmp_file = File.join("./tmp",path)
         STDOUT.puts "tmp_file => #{tmp_file}"
+        STDOUT.puts "File.size(tmp_file) => #{File.size(tmp_file)}"
         header = header_of_binary_data(path)
-        if File.exist? tmp_file
+        if File.exist?(tmp_file) and File.size(tmp_file) > 0
           p "File.exist? #{File.exist? tmp_file}: #{tmp_file}"
           File.open(tmp_file,"rb") do |fp|
             #size = fp.stat.size
