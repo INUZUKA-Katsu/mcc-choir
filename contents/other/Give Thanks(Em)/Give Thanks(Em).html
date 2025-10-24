@@ -3,8 +3,58 @@
 	<head>
 		<meta charset="UTF-8">
 		<link rel="icon" type="image/png" sizes="16x16" href="/img/favicon.ico">
-    <script type="text/javascript" src="/js/get_mp3.js"></script>
+    <script src="/js/get_information.js"></script>
+    <script src="/js/svgPiano.js"></script>
+    <script src="/js/howler.core.js"></script>
+    <script src="https://unpkg.com/@tonejs/midi"></script>
+	  <script type='text/javascript'>
+      const mp3Files = {
+        soprano     : '/other/Give Thanks(Em)/01 Give Thanks(Em,soprano).mp3',
+        alto        : '/other/Give Thanks(Em)/02 Give Thanks(Em,alto).mp3',
+        tenor       : '/other/Give Thanks(Em)/03 Give Thanks(Em,tenor).mp3',
+        bass        : '/other/Give Thanks(Em)/04 Give Thanks(Em,bass).mp3',
+        full        : '/other/Give Thanks(Em).mp3',
+        vcl_alto : '/other/Give Thanks(Em)/Give Thanks(Em,vcl_alto).mp3'
+      };
+      const midiFiles = {
+        soprano: ['/other/Give Thanks(Em)/Give Thanks(Em).mid', 0],
+        alto: ['/other/Give Thanks(Em)/Give Thanks(Em).mid', 1],
+        tenor: ['/other/Give Thanks(Em)/Give Thanks(Em).mid', 2],
+        bass: ['/other/Give Thanks(Em)/Give Thanks(Em).mid', 3],
+        full: ['/other/Give Thanks(Em)/Give Thanks(Em).mid', [0,1,2,3]],
+        vcl_alto: ['/other/Give Thanks(Em)/Give Thanks(Em).mid', 1]
+      }
+    </script>  
 		<style type="text/css">
+      div.audio-container {
+        height: 30px;
+        width: 400px;
+        display: flex;
+        flex-direction: row;
+        align-items: center;
+        margin-bottom: 10px;
+        gap: 5px
+      }
+      span.timeDisplay {
+        width: auto;
+        font-size: 12px;
+        text-wrap: nowrap;
+      }
+      div.segment-btn-container {
+        width: auto;
+        display: block;
+        margin-bottom: 10px;
+      }
+      div.segment-btn-container button {
+        width: auto;
+        height: 1.6em;
+        margin-right: 5px;
+      }
+      li {height: auto;}
+      li div {
+        width: "";
+        display: block;
+      }
 			div.h4   {font-size:1.2em;font-style:oblique;}
 			div.nen  {margin-top:1em;}
       h4       {margin:1em 0 2em 1em;font-size:150%;font-style:oblique;}
@@ -15,18 +65,7 @@
       video    {display: block;
                 max-width: 300px;
                 }
-		</style>
-    <script language="javascript" type="text/javascript">
-      function plus_password(target){
-        if(target==undefined){
-          target=location.pathname;
-        }
-        var password = prompt("Please enter the password:");
-        if (password != null && password !== "") {
-          window.location.href = target + "&password=" + password;
-        }
-      };
-    </script>
+    </style>
 		<title>'大いなる方に(変ホ長調)'パート別練習用音源</title>
 	</head>
 	<body>
@@ -36,28 +75,25 @@
   <ul>
     <li>
       <div>ソプラノ</div>
-      <audio src='/other/Give Thanks(Em)/01 Give Thanks(Em,soprano).mp3' controls preload="none" loop></audio>
-      &nbsp;&nbsp;<a href='/other/Give Thanks(Em)/01 Give Thanks(Em,soprano).mp3' download><img src='/img/download-m.png'></a>
+      <div class="audio-container" name="soprano"></div>
     </li>
     <li>
       <div>アルト</div>
-      <audio src='/other/Give Thanks(Em)/02 Give Thanks(Em,alto).mp3' controls preload="none" loop></audio>
-      &nbsp;&nbsp;<a href='/other/Give Thanks(Em)/02 Give Thanks(Em,alto).mp3' download><img src='/img/download-m.png'></a>
-    </li>
+      <div class="audio-container" name="alto"></div>
+      <div class="vcl">AI Vocal</div>
+      <div class="audio-container" name="vcl_alto"></div>
+      </li>
     <li>
       <div>テノール</div>
-      <audio src='/other/Give Thanks(Em)/03 Give Thanks(Em,tenor).mp3' controls preload="none" loop></audio>
-      &nbsp;&nbsp;<a href='/other/Give Thanks(Em)/03 Give Thanks(Em,tenor).mp3' download><img src='/img/download-m.png'></a>
+      <div class="audio-container" name="tenor"></div>
     </li>
     <li>
       <div>バス</div>
-      <audio src='/other/Give Thanks(Em)/04 Give Thanks(Em,bass).mp3' controls preload="none" loop></audio>
-      &nbsp;&nbsp;<a href='/other/Give Thanks(Em)/04 Give Thanks(Em,bass).mp3' download><img src='/img/download-m.png'></a>
+      <div class="audio-container" name="bass"></div>
     </li>
     <li>
       <div>コーラス</div>
-      <audio src='/other/Give Thanks(Em).mp3' controls preload="none" loop></audio>
-      &nbsp;&nbsp;<a href='/other/Give Thanks(Em).mp3' download><img src='/img/download-m.png'></a>
+      <div class="audio-container" name="full"></div>
     </li>
     <li>
       <a href='#' onclick="plus_password()">5月5日の練習時の指揮の様子（動画）</a>
@@ -68,12 +104,41 @@
   </ul>
 </div>
 
+<div id="piano-container"></div>
+
 <div class='link'>
   <a href='../Carry Me/Carry Me.html'>⇒ Carry Me</a><br>
   <a href='../Give Thanks/Give Thanks.html'>⇒ 大いなる方に（2011.10賛美のアレジメント版）</a><br>
   <a href='/mcc/index.html'>⇒ MCCワーシップクワイアーの持ち歌のページに戻る.</a>
 </div>
+<script>
+  // ピアノ鍵盤のSVGを作成
+  const svgPiano = new SvgPiano(
+    'piano-container',
+    {
+        min_key_number: 39,
+        number_of_white_keys: 23,
+        white_key_width: 30,
+        white_key_height: 120,
+        black_key_width: 24,
+        black_key_height: 70,
+        volume: 0.5
+    }
+  );
+  // パート別に play,pause,stopの各ボタン、seekBar,timeDisplay を作成
+  const audioControls = setAudioControls(".audio-container");
 
-	</body>
+  // audioControlインスタンスに、svgPiano,midiファイル,mp3ファイル等を設定
+  audioControls.forEach(audioControl => {
+    const name = audioControl.options.name;
+    audioControl.update({
+      svgPiano: svgPiano,
+      mp3File: mp3Files[name],
+      midiFile: midiFiles[name][0],
+      trackIndex: midiFiles[name][1],
+    });
+  });
+</script>
+</body>
 </html>
 

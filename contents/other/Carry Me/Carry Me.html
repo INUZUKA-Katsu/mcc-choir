@@ -11,11 +11,11 @@
     <script src="/js/svgPiano.js"></script>
     <script type='text/javascript'>
       const mp3Files = {
-        soprano : ['/other/Carry Me/Carry Me(soprano).mp3',1.3],
-        alto    : ['/other/Carry Me/Carry Me(alto).mp3',1.3],
-        tenor   : ['/other/Carry Me/Carry Me(tenor).mp3',1.3],
-        bass    : ['/other/Carry Me/Carry Me(bass).mp3',1.3],
-        full    : ['/other/Carry Me/Carry Me(full).mp3',1.3],
+        soprano : '/other/Carry Me/Carry Me(soprano).mp3',
+        alto    : '/other/Carry Me/Carry Me(alto).mp3',
+        tenor   : '/other/Carry Me/Carry Me(tenor).mp3',
+        bass    : '/other/Carry Me/Carry Me(bass).mp3',
+        full    : '/other/Carry Me/Carry Me(full).mp3',
         soprano25 : '/other/Carry Me/01 Carry Me(soprano,25).mp3',
         alto25    : '/other/Carry Me/02 Carry Me(alto,25).mp3',
         tenor25   : '/other/Carry Me/03 Carry Me(tenor,25).mp3',
@@ -83,6 +83,9 @@
         width: auto;
         height: 1.6em;
         margin-right: 5px;
+      }
+      div#piano-container {
+        margin-bottom: 2em;
       }
       li {height: auto;}
       li div {width: "";}
@@ -190,7 +193,10 @@
 <p>　　　Carry me</p>
 <br />
 </div>
-<p style="text-align:center;">楽譜（繰返し部分を独立のページにすることで楽譜上の繰り返しをなくしたもの）<br /><a href='#' onclick="plus_password('./Carry Me.pdf')"><img src="https://i.gyazo.com/89f45833794dd757ef41c9fb27521ceb.png" width="50%"></a></p>
+<p style="text-align:center;">楽譜（繰返し部分を独立のページにすることで楽譜上の繰り返しをなくしたもの）
+  <br /><br />
+  <a href='#' onclick="plus_password('./Carry Me.pdf')"><img src="https://i.gyazo.com/89f45833794dd757ef41c9fb27521ceb.png" width="50%"></a>
+</p>
 
   <div class='link'>
     <a href='../Give Thanks(Em)/Give Thanks(Em).html'>⇒ 大いなる方に(変ホ長調)</a><br>
@@ -218,20 +224,12 @@
   // audioControlインスタンスに、svgPiano,midiファイル,mp3ファイル等を設定
   audioControls.forEach(audioControl => {
     const name = audioControl.options.name;
-    let mp3File, OFFSET;
-    if (Array.isArray(mp3Files[name])) {
-      mp3File = mp3Files[name][0];
-      OFFSET = mp3Files[name][1];
-    } else {
-      mp3File = mp3Files[name];
-      OFFSET = 0;
-    }
     audioControl.update({
       svgPiano: svgPiano,
-      mp3File: mp3File,
+      mp3File: mp3Files[name],
       midiFile: midiFiles[name][0],
       trackIndex: midiFiles[name][1],
-      OFFSET: OFFSET,
+      OFFSET: 1.3,
     });
   });
 

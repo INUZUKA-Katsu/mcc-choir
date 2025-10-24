@@ -5,23 +5,29 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
 	  <link rel="icon" type="image/png" sizes="16x16" href="/img/favicon.ico">
     <link rel="stylesheet" href="/css/choir.css">
-    <style type="text/css">
-      span {
-             vertical-align: super;
-             font-size:0.6em
-           }
-      span.part {
-            color : blue;
-            border: solid 1px #454545;
-           }
-    </style>
-		<!--script type="text/javascript" src="/js/get_mp3.js"></script-->
+		<script src="/js/get_mp3.js"></script>
+    <script src="/js/get_information.js"></script>
+    <script src="/js/svgPiano.js"></script>
+    <script src="/js/howler.core.js"></script>
+    <script src="https://unpkg.com/@tonejs/midi"></script>
     <script type="text/javascript">
-      var elms = document.getElementsByTagName('audio');
-      var t_ranges={};
-      var seibus=["soprano","alto","tenor","bass","full"]
-      seibus.forEach(seibu=>{
-        t_ranges[seibu]={
+      const mp3Files = {
+        soprano : '/easter/ShizukaniMate/ShizukaniMate(soprano).mp3',
+        soprano_amen : '/easter/ShizukaniMate/ShizukaniMate(soprano_amen).mp3',
+        alto    : '/easter/ShizukaniMate/ShizukaniMate(alto).mp3',
+        tenor   : '/easter/ShizukaniMate/ShizukaniMate(tenor).mp3',
+        bass    : '/easter/ShizukaniMate/ShizukaniMate(bass).mp3',
+        full    : '/easter/ShizukaniMate.mp3',
+      };
+      const midiFiles = {
+        soprano : ['/easter/ShizukaniMate/ShizukaniMate.mid',0],
+        soprano_amen : ['/easter/ShizukaniMate/ShizukaniMate(soprano_amen).mid',0],
+        alto    : ['/easter/ShizukaniMate/ShizukaniMate.mid',1],
+        tenor   : ['/easter/ShizukaniMate/ShizukaniMate.mid',2],
+        bass    : ['/easter/ShizukaniMate/ShizukaniMate.mid',3],
+        full    : ['/easter/ShizukaniMate/ShizukaniMate.mid',[0,1,2,3]]
+      };
+      const ranges = {
             'A':'0,11.2',
             'B':'11.5,22.7',
             'C':'22.9,34.4',
@@ -31,18 +37,46 @@
             'G':'137,147',
             'G2':'0,8'
         };
-      })
-      function get_trange(seibu,part){
-        return t_ranges[seibu][part];
-      }
-      function get_src(seibu){
-        if(seibu=="full"||seibu==undefined){
-          return src='/easter/ShizukaniMate.mp3';
-        }else{
-          return src='/easter/ShizukaniMate/ShizukaniMate(' + seibu + ').mp3';
-        }
-      }
     </script>
+    <style type="text/css">
+      div.audio-container {
+        height: 30px;
+        width: 400px;
+        display: flex;
+        flex-direction: row;
+        align-items: center;
+        margin-bottom: 10px;
+        gap: 5px
+      }
+      span.timeDisplay {
+        width: auto;
+        font-size: 12px;
+        text-wrap: nowrap;
+      }
+      div.segment-btn-container {
+        width: auto;
+        display: block;
+        margin-bottom: 10px;
+      }
+      div.segment-btn-container button {
+        width: auto;
+        height: 1.6em;
+        margin-right: 5px;
+      }
+      li {height: auto;}
+      li div {
+        width: "";
+        display: block;
+      }
+      span {
+             vertical-align: super;
+             font-size:0.6em
+           }
+      span.part {
+            color : blue;
+            border: solid 1px #454545;
+           }
+    </style>
     <title>'しずかに待てわがたまよ（聖歌294）'パート別練習用音源</title>
   </head>
   <body>
@@ -54,75 +88,69 @@
       <ul style="list-style: none;">
         <li>
           <div class="part">ソプラノ</div>
-          <audio src='/easter/ShizukaniMate/ShizukaniMate(soprano).mp3' controls loop preload="none" id='soprano'></audio>
-          <audio src='/easter/ShizukaniMate/ShizukaniMate(soprano_amen).mp3' preload="none" id='soprano_amen'></audio>
-          &nbsp;&nbsp;<a href='/easter/ShizukaniMate/ShizukaniMate(soprano).mp3' download><img src='/img/download-m.png'></a>
-          <br>
-          <button onclick="play_repeat('soprano','A',this)">A</button>
-          <button onclick="play_repeat('soprano','B',this)">B</button>
-          <button onclick="play_repeat('soprano','C',this)">C</button>
-          <button onclick="play_repeat('soprano','D',this)">D</button>
-          <button onclick="play_repeat('soprano','E',this)">E</button>
-          <button onclick="play_repeat('soprano','F',this)">F</button>
-          <button onclick="play_repeat('soprano','G',this)">G</button>
-          <button onclick="play_repeat('soprano_amen','G2',this)">G2</button>
-          <button onclick="stop_audio('soprano')">stop</button>
+          <div class="audio-container" name="soprano"></div>
+          <div class="segment-btn-container" name="soprano">
+            <button class="playBtn" name='A'>A</button>
+            <button class="playBtn" name='B'>B</button>
+            <button class="playBtn" name='C'>C</button>
+            <button class="playBtn" name='D'>D</button>
+            <button class="playBtn" name='E'>E</button>
+            <button class="playBtn" name='F'>F</button>
+            <button class="playBtn" name='G'>G</button>
+            <button class="playBtn" name='G2'>G2</button>
+          </div>
         </li>
         <li>
           <div class="part">アルト</div>
-          <audio src='/easter/ShizukaniMate/ShizukaniMate(alto).mp3' controls loop preload="none" id='alto'></audio>
-          &nbsp;&nbsp;<a href='/easter/ShizukaniMate/ShizukaniMate(alto).mp3' download><img src='/img/download-m.png'></a>
-          <br>
-          <button onclick="play_repeat('alto','A',this)">A</button>
-          <button onclick="play_repeat('alto','B',this)">B</button>
-          <button onclick="play_repeat('alto','C',this)">C</button>
-          <button onclick="play_repeat('alto','D',this)">D</button>
-          <button onclick="play_repeat('alto','E',this)">E</button>
-          <button onclick="play_repeat('alto','F',this)">F</button>
-          <button onclick="play_repeat('alto','G',this)">G</button>
-          <button onclick="stop_audio('alto')">stop</button>
+          <div class="audio-container" name="alto"></div>
+          <div class="segment-btn-container" name="alto">
+            <button class="playBtn" name='A'>A</button>
+            <button class="playBtn" name='B'>B</button>
+            <button class="playBtn" name='C'>C</button>
+            <button class="playBtn" name='D'>D</button>
+            <button class="playBtn" name='E'>E</button>
+            <button class="playBtn" name='F'>F</button>
+            <button class="playBtn" name='G'>G</button>
+          </div>
         </li>
         <li>
           <div class="part">テノール</div>
-          <audio src='/easter/ShizukaniMate/ShizukaniMate(tenor).mp3' controls loop preload="none" id='tenor'></audio>
-          &nbsp;&nbsp;<a href='/easter/ShizukaniMate/ShizukaniMate(tenor).mp3' download><img src='/img/download-m.png'></a>
-          <br>
-          <button onclick="play_repeat('tenor','A',this)">A</button>
-          <button onclick="play_repeat('tenor','B',this)">B</button>
-          <button onclick="play_repeat('tenor','C',this)">C</button>
-          <button onclick="play_repeat('tenor','D',this)">D</button>
-          <button onclick="play_repeat('tenor','E',this)">E</button>
-          <button onclick="play_repeat('tenor','F',this)">F</button>
-          <button onclick="play_repeat('tenor','G',this)">G</button>
-          <button onclick="stop_audio('tenor')">stop</button>
+          <div class="audio-container" name="tenor"></div>
+          <div class="segment-btn-container" name="tenor">
+            <button class="playBtn" name='A'>A</button>
+            <button class="playBtn" name='B'>B</button>
+            <button class="playBtn" name='C'>C</button>
+            <button class="playBtn" name='D'>D</button>
+            <button class="playBtn" name='E'>E</button>
+            <button class="playBtn" name='F'>F</button>
+            <button class="playBtn" name='G'>G</button>
+          </div>
         </li>
         <li>
           <div class="part">バス</div>
-          <audio src='/easter/ShizukaniMate/ShizukaniMate(bass).mp3' controls loop preload="none" id='bass'></audio>
-          &nbsp;&nbsp;<a href='/easter/ShizukaniMate/ShizukaniMate(bass).mp3' download><img src='/img/download-m.png'></a>
-          <br>
-          <button onclick="play_repeat('bass','A',this)">A</button>
-          <button onclick="play_repeat('bass','B',this)">B</button>
-          <button onclick="play_repeat('bass','C',this)">C</button>
-          <button onclick="play_repeat('bass','D',this)">D</button>
-          <button onclick="play_repeat('bass','E',this)">E</button>
-          <button onclick="play_repeat('bass','F',this)">F</button>
-          <button onclick="play_repeat('bass','G',this)">G</button>
-          <button onclick="stop_audio('bass')">stop</button>
+          <div class="audio-container" name="bass"></div>
+          <div class="segment-btn-container" name="bass">
+            <button class="playBtn" name='A'>A</button>
+            <button class="playBtn" name='B'>B</button>
+            <button class="playBtn" name='C'>C</button>
+            <button class="playBtn" name='D'>D</button>
+            <button class="playBtn" name='E'>E</button>
+            <button class="playBtn" name='F'>F</button>
+            <button class="playBtn" name='G'>G</button>
+          </div>
         </li>
         <li>
           <div class="part">コーラス</div>
-          <audio src='/easter/ShizukaniMate.mp3' controls loop preload="none" id='full'></audio>
-          &nbsp;&nbsp;<a href='/easter/ShizukaniMate.mp3' download><img src='/img/download-m.png'></a>
-          <br>
-          <button onclick="play_repeat('full','A',this)">A</button>
-          <button onclick="play_repeat('full','B',this)">B</button>
-          <button onclick="play_repeat('full','C',this)">C</button>
-          <button onclick="play_repeat('full','D',this)">D</button>
-          <button onclick="play_repeat('full','E',this)">E</button>
-          <button onclick="play_repeat('full','F',this)">F</button>
-          <button onclick="play_repeat('full','G',this)">G</button>
-          <button onclick="stop_audio('full')">stop</button>
+          <div class="audio-container" name="full"></div>
+          <div class="segment-btn-container" name="full">
+            <button class="playBtn" name='A'>A</button>
+            <button class="playBtn" name='B'>B</button>
+            <button class="playBtn" name='C'>C</button>
+            <button class="playBtn" name='D'>D</button>
+            <button class="playBtn" name='E'>E</button>
+            <button class="playBtn" name='F'>F</button>
+            <button class="playBtn" name='G'>G</button>
+          </div>
         </li>
         <li>
           <div class="part">Be Still My Soul (Exultate Singers)</div>
@@ -162,10 +190,85 @@
     
         <span style="font-size:50%">※ 上付きの数字は何拍伸ばすかを示す.</span>
       </div>
+
+      <div id="piano-container"></div>
+
       <div class='link'>
         <a href='/mcc/index.html'>⇒ MCCワーシップクワイアーの持ち歌のページに戻る.</a>
       </div>
     </div>
     </div>
+    <script>
+      // ピアノ鍵盤のSVGを作成
+      const svgPiano = new SvgPiano(
+        'piano-container',
+        {
+            min_key_number: 39,
+            number_of_white_keys: 23,
+            white_key_width: 30,
+            white_key_height: 120,
+            black_key_width: 24,
+            black_key_height: 70,
+            volume: 0.5
+        }
+      );
+      // パート別に play,pause,stopの各ボタン、seekBar,timeDisplay を作成
+      const audioControls = setAudioControls(".audio-container");
+    
+      // audioControlインスタンスに、svgPiano,midiファイル,mp3ファイル等を設定
+      audioControls.forEach(audioControl => {
+        const name = audioControl.options.name;
+        audioControl.update({
+          svgPiano: svgPiano,
+          mp3File: mp3Files[name],
+          midiFile: midiFiles[name][0],
+          trackIndex: midiFiles[name][1],
+        });
+      });
+    
+      document.querySelectorAll(".playBtn").forEach(btn => {
+        btn.addEventListener("click", function() {
+          const parentName = btn.parentNode.getAttribute("name");
+          const segment = btn.getAttribute("name");
+          const audioControl = audioControls.find(control => control.options.name === parentName );
+          
+          if (segment !== 'G2') {
+            if (audioControl.options.currentFileSetIndex != 0) {
+              audioControl.switchFileSet('Original');
+            }
+            const range = ranges[segment];
+            const [start,end] = range.split(",");      
+            console.log(`start,end => ${start},${end}`);
+            
+            audioControl.update({ segment: range })
+            
+            if (Number(start) < audioControl.seekBar.value) {
+              console.log(`audioControl.seekBar.value => ${audioControl.seekBar.value}`);
+              audioControl.playSegment(audioControl.seekBar.value,Number(end));
+            } else {
+              console.log("audioControl.playSegment()")
+              audioControl.playSegment();
+            }
+          } else {
+            if (audioControl.options.currentFileSetIndex == 0) {
+              audioControl.switchFileSet('soprano_amen');
+              setTimeout(() => {
+                audioControl.play();
+              }, 500);
+            } else {
+              audioControl.play();
+            }
+          }
+        });
+      });
+      // ソプラノのG2の音源等ファイルセットを追加
+      const sopranoAudioControl = audioControls.find(control => control.options.name === 'soprano');
+      sopranoAudioControl.addFileSet({
+        mp3File: mp3Files['soprano_amen'],
+        midiFile: midiFiles['soprano_amen'][0],
+        trackIndex: midiFiles['soprano_amen'][1],
+        name: 'soprano_amen'
+      });
+    </script>
   </body>
 </html>
