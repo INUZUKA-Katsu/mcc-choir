@@ -228,6 +228,10 @@ class Choir
       @client.download path do |chunk|
         contents << chunk
       end
+    rescue DropboxApi::Errors::ExpiredAccessTokenError
+      @access_token = get_dropbox_access_token
+      @client = DropboxApi::Client.new(@access_token)
+      get_from_dropbox(path)
     rescue=>e
       p "failed to get from dropbox: #{path} @get_from_dropbox"
       p e.message
@@ -389,8 +393,8 @@ EOS
       end
     end
     refresh_token = ENV['DROPBOX_REFRESH_TOKEN']
-    app_key = ENV['DROPBOX_APP_KEY']
-    app_secret = ENV['DROPBOX_APP_SECRET']
+    app_key       = ENV['DROPBOX_APP_KEY']
+    app_secret    = ENV['DROPBOX_APP_SECRET']
     
     res=`curl https://api.dropbox.com/oauth2/token \
         -d grant_type=refresh_token \
