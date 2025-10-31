@@ -300,6 +300,44 @@ function stopNote(midi) {
     }
 }
 
+function setTempoDisplay(){
+  document.querySelectorAll(".tempo-display").forEach(container => {
+    const name = container.getAttribute("name");
+    if (name) {
+      const input = document.createElement("input");
+      input.setAttribute("type", "text");
+      input.setAttribute("class", "tempoDisplay");
+      input.setAttribute("value", "♩=120");
+      container.appendChild(input);
+      
+      const downBtn = document.createElement("div");
+      downBtn.setAttribute("class", "down");
+      downBtn.innerHTML = "ー";
+      container.appendChild(downBtn);
+      
+      const upBtn = document.createElement("div");
+      upBtn.setAttribute("class", "up");
+      upBtn.innerHTML = "＋";
+      container.appendChild(upBtn);
+    }
+  });
+  document.querySelectorAll('.tempo-display div').forEach(div => {
+    div.addEventListener('click', () => {
+      const name =div.parentNode.getAttribute("name");
+      const tempoDisplay = div.parentNode.querySelector('input');
+      const currentTempo = Number(tempoDisplay.value.replace('♩=',''));
+      let newTempo ;
+      if (div.className === 'down') {
+        newTempo = currentTempo - 1;
+      } else {
+        newTempo = currentTempo + 1;
+      }
+      const audioControl = audioControls.find(control => control.options.name === name );
+      audioControl.updateTempo(newTempo);
+    });
+  });
+}
+
 function setAudioControls(containerClassName){
   const audioControls = [];
   document.querySelectorAll(containerClassName).forEach(container => {
@@ -375,37 +413,37 @@ class MidiPlayer {
       this.scheduledTimeouts = [];
       this.isLoaded = false;
       this.midi = null;
+      this.baseBpm = null;
+      this.rate = 1;
     }
     
     async loadMidi(midiFile) {
       const midiResponse = await fetch(midiFile);
       const midiArrayBuffer = await midiResponse.arrayBuffer();
       this.midi = new Midi(midiArrayBuffer);
-      console.log("316:midi.tracks");
       console.log(this.midi.tracks.length);
       console.dir(this.midi.tracks);
+      const bpm = this.midi.header.tempos[0]?.bpm || 120;
+      this.baseBpm = Math.round(bpm);
       this.isLoaded = true;
     }
 
     // ========= MIDIハイライトのスケジューリングメソッド =========
     //引数pianoはSvgPianoクラスのインスタンス
-    async scheduleMidHeighlight(seekPosition) {
-      console.trace();
+    //引数seekPositionは秒単位の再生位置(tempo変更時は換算後の体感時間の秒)
+    async scheduleMidHighlight(seekPosition) {
+      //console.log(`seekPosition:${seekPosition} @scheduleMidHighlight`);
+      //console.trace();
       await this.loadingPromise; // MIDIファイルが読み込まれるのを待つ
       
-      console.log("scheduleMidHeighlight:step1");
-
       this.scheduledTimeouts.forEach(clearTimeout);
       this.scheduledTimeouts = [];
       this.resetAllKeys();
       
-      console.log("scheduleMidHeighlight:step2");
-      const start = this.midiSegment[0];
-      const duration = this.midiSegment[1];
+      const start = this.midiSegment[0] / this.rate;
+      const duration = this.midiSegment[1] / this.rate;
       const end = start + duration;
-      const offset = this.OFFSET;
-
-      console.log("scheduleMidHeighlight:step3");
+      const offset = this.OFFSET / this.rate;
 
       const trackIndices = this.convertedTrackIndex();
       const tracksToProcess =
@@ -413,25 +451,23 @@ class MidiPlayer {
           ? this.midi.tracks
           : this.midi.tracks.filter((_, i) => trackIndices.includes(i));
 
-      console.log("scheduleMidHeighlight:step4");
-        
       tracksToProcess.forEach(track => {
         track.notes.forEach(note => {
           console.log(`note.time < start: ${note.time} < ${start}`);
           // MIDIセグメント外のノートはスキップ
-          if (note.time  < start || note.time > end) return;
+          if ((note.time / this.rate)  < start || (note.time / this.rate) > end) return;
 
-          const relStart = note.time - start + offset;
-          const relEnd = relStart + note.duration;
+          const relStart = note.time / this.rate - start + offset;
+          const relEnd = relStart + note.duration / this.rate;
           
-          const heighlightDelay = (relStart - seekPosition) * 1000;
-          const resetDelay = (relEnd - seekPosition) * 1000;  
+          const highlightDelay = (relStart - seekPosition ) * 1000;
+          const resetDelay = (relEnd - seekPosition ) * 1000;  
           
-          console.log(`note.midi:${note.midi}、heighlightDelay:${heighlightDelay}`);
+          console.log(`note.midi:${note.midi}、highlightDelay:${highlightDelay}`);
 
           if (relStart >= seekPosition) {
 
-            const startTimer = setTimeout(() => this.highlightKey(note.midi),heighlightDelay);
+            const startTimer = setTimeout(() => this.highlightKey(note.midi),highlightDelay);
             const endTimer = setTimeout(() => this.resetKey(note.midi),resetDelay);
             this.scheduledTimeouts.push(startTimer,endTimer);
 
@@ -547,6 +583,7 @@ class MidiPlayer {
 
       this.midi = null;
       this.midiSegment = null;
+      this.rate = 1;
 
       // 拡張用プロパティ
       this.additionalSounds = [];
@@ -631,7 +668,7 @@ class MidiPlayer {
           },
           onplay: () => {
             this.seekTimer = setInterval(() => {
-              if (!this.isDragging) this.seekBar.value = preloadedSet.sound.seek();
+              if (!this.isDragging) this.seekBar.value = preloadedSet.sound.seek() / this.rate;
               this.updateTimeDisplay();
             }, 100);
           },
@@ -747,7 +784,7 @@ class MidiPlayer {
         },
         onplay: () => {
           this.seekTimer = setInterval(() => {
-            if (!this.isDragging) this.seekBar.value = this.sound.seek();
+            if (!this.isDragging) this.seekBar.value = this.sound.seek() / this.rate;
             this.updateTimeDisplay();
           }, 100);
         },
@@ -777,6 +814,11 @@ class MidiPlayer {
       );
       this.options.preloadedSets[0].midiPlayer = this.midiPlayer;
       this.currentMidiPlayer = this.midiPlayer;
+
+      this.midiPlayer.loadingPromise.then(() => {
+        const tempo = this.midiPlayer.baseBpm;
+        this.updateTempoDisplay(tempo);
+      });
     }
 
     update(newOptions){
@@ -817,7 +859,7 @@ class MidiPlayer {
       this.currentSound.off('end');
       
       this.scheduleMidHighlight(this.seekBar.value);
-      this.currentSound.seek(this.seekBar.value);
+      this.currentSound.seek(this.seekBar.value * this.rate);
       this.currentSound.play();
 
       this.isPlaying = true;
@@ -854,8 +896,11 @@ class MidiPlayer {
       const [options_start, options_end] = this.options.segment.split(",");
       if (start === undefined && end === undefined && this.options.segment) {
         [start, end] = [Number(options_start), Number(options_end)];
-        if (start < this.seekBar.value && this.seekBar.value < end) start = this.seekBar.value;
-      
+        if ((start / this.rate) < this.seekBar.value
+            && this.seekBar.value < (end / this.rate) )
+        {
+          start = this.seekBar.value * this.rate;
+        }      
       } else if (start !== undefined && end === undefined && this.options.segment) {
         [start, end] = [Number(start), Number(options_end)];
       
@@ -863,9 +908,9 @@ class MidiPlayer {
         [start, end] = [Number(start), Number(end)];
       }
       
-      // 再生開始位置をstart秒に設定
+      // 再生開始位置をstart秒に設定(Howlerのseekは速度変更しても不変。scheduleMidHighlightは体感時間に換算して引数に渡す。)
       this.currentSound.seek(start);
-      this.scheduleMidHighlight(start);
+      this.scheduleMidHighlight(start / this.rate);
       
       // 再生開始
       this.currentSound.play();
@@ -883,88 +928,13 @@ class MidiPlayer {
       }, duration);
     }
     
-    //play() {
-    //  if (this.isPlaying) {
-    //    this.stop();
-    //    setTimeout(() => {
-    //      this.sound.seek(0);
-    //      this.play();
-    //    },1000);
-    //    return
-    //  }
-    //  this.stopOtherAudio();
-    //  this.scheduleMidHighlight(this.seekBar.value);
-    //  this.sound.seek(this.seekBar.value); //pauseしている場合はpause位置からスタート
-    //  this.sound.play();
-    //  this.isPlaying = true;
-    //  // ループ再生（鍵盤ハイライトもループ）
-    //  if (this.options.loop) {
-    //    this.sound.on('end', () => {
-    //      setTimeout(() => {
-    //        this.seekBar.value = 0;
-    //        this.sound.seek(0);
-    //        this.play();
-    //      }, 1500);
-    //    });
-    //  }
-    //}
-
-    // 指定された時間区間を再生
-    //playSegment(start, end) {
-    //  if (this.isPlaying) {
-    //    this.stop();
-    //    setTimeout(() => {
-    //      this.sound.seek(0);
-    //      this.playSegment();
-    //    },1000);
-    //    return
-    //  }
-    //  this.stopOtherAudio();
-    //  console.log(`this.options.segment => ${this.options.segment}`);
-    //  const [options_start, options_end] = this.options.segment.split(",");
-    //  if (start === undefined && end === undefined && this.options.segment) {
-    //    console.log("rout1 @playSegment");
-    //    [start, end] = [ Number(options_start), Number(options_end) ];
-    //    if (start < this.seekBar.value && this.seekBar.value < end) start = this.seekBar.value; //pauseからの再開の場合
-    //  
-    //  } else if (start !== undefined && end === undefined && this.options.segment) {
-    //    console.log("rout2 @playSegment");
-    //    [start, end] = [ Number(start), Number(options_end)] ;
-    //  
-    //  } else if (start !== undefined && end !== undefined) {
-    //    console.log("rout3 @playSegment");
-    //    [start, end] = [ Number(start), Number(end)] ;
-    //  }
-    //  console.log(`start, end => ${start},${end}`);
-    //
-    //  // 再生開始位置をstart秒に設定
-    //  this.sound.seek(start);
-    //  
-    //  // 再生開始
-    //  this.scheduleMidHighlight(start);
-    //  console.log("ハイライトスケジュール完了");
-    //  this.sound.play();
-    //  console.log("再生開始");
-    //  this.isPlaying = true;
-    //  
-    //  // end秒で再生を停止
-    //  const duration = (end - start) * 1000; // ミリ秒に変換
-    //  this.loopTimer = setTimeout(() => {
-    //    this.stop();
-    //    if (this.options.loop) {
-    //      setTimeout(() => {
-    //        this.playSegment();
-    //      }, 1500);
-    //    }
-    //  }, duration);
-    //}
-    
     pause() {
       if (this.currentSound) {
         this.currentSound.pause();
       }
       this.clearScheduledTimeouts();
       this.isPlaying = false;
+      //console.log(`seekBar.value:${this.seekBar.value} @pause`);
     }
 
     stop() {
@@ -982,7 +952,7 @@ class MidiPlayer {
     seek() {
       this.isDragging = true;
       if (this.currentSound) {
-        this.currentSound.seek(this.seekBar.value);
+        this.currentSound.seek(this.seekBar.value * this.rate);
       }
       this.clearScheduledTimeouts();
       this.resetAllKeys();
@@ -992,7 +962,7 @@ class MidiPlayer {
     
     endSeek() {
       if (this.currentSound) {
-        this.seekBar.value = this.currentSound.seek();
+        this.seekBar.value = this.currentSound.seek() / this.rate;
       }
       this.isDragging = false;
       //this.scheduleMidHighlight(this.seekBar.value);
@@ -1000,8 +970,9 @@ class MidiPlayer {
     }
     
     scheduleMidHighlight(currentTime) {
+      //currentTimeは秒単位の再生位置(tempo変更時は換算後の体感時間の秒)
       if (this.currentMidiPlayer) {
-        this.currentMidiPlayer.scheduleMidHeighlight(currentTime);
+        this.currentMidiPlayer.scheduleMidHighlight(currentTime);
       }
     }
     
@@ -1026,6 +997,18 @@ class MidiPlayer {
         });
       }
     }
+
+    updateTempo(tempo) {
+      if (this.currentMidiPlayer) {
+        this.rate = tempo / this.currentMidiPlayer.baseBpm;
+        this.currentSound.rate(this.rate);
+        this.currentMidiPlayer.rate = this.rate;
+        this.updateTempoDisplay(tempo)
+        this.updateTimeDisplay();
+        this.seekBar.max = this.currentSound.duration() / this.rate;
+        this.seekBar.value = this.currentSound.seek() / this.rate;
+      }
+    }
     
     // 時間を MM:SS 形式にフォーマットする関数
     formatTime(seconds) {
@@ -1039,13 +1022,17 @@ class MidiPlayer {
     updateTimeDisplay() {
       if (!this.timeDisplay || !this.currentSound) return;
       
-      const currentTime = this.currentSound.seek();
-      const duration = this.currentSound.duration();
+      const currentTime = this.currentSound.seek() / this.rate;
+      const duration = this.currentSound.duration() / this.rate;
       
       const currentFormatted = this.formatTime(currentTime);
       const durationFormatted = this.formatTime(duration);
       
       this.timeDisplay.textContent = `${currentFormatted} / ${durationFormatted}`;
+    }
+    updateTempoDisplay(tempo) {
+      const inputElement = document.querySelector(`.tempo-display[name="${this.options.name}"] input`);
+      if (inputElement) inputElement.value = `♩=${tempo}`;
     }
   }
 
