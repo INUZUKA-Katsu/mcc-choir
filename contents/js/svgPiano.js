@@ -574,6 +574,7 @@ class MidiPlayer {
       this.timeDisplay = document.getElementById(this.options.timeDisplay);
       
       this.howl = null;
+      this.howler_html5 = false;
       this.sound = null;
       this.midiPlayer = null;
       this.seekTimer = null;
@@ -618,6 +619,11 @@ class MidiPlayer {
     }
 
     async init() {
+      if (window.AudioContext || window.webkitAudioContext) {
+        this.howler_html5 = false;
+      } else {
+        this.howler_html5 = true;
+      }
       if (this.options.mp3File) {
         this.setupMp3();
       }
@@ -642,6 +648,19 @@ class MidiPlayer {
         });
         this.seekBar.addEventListener('change', () => this.endSeek());
       }
+
+      // ✅ iOS Safari 対応：最初のタップでAudioContextを再開
+      if (typeof Howler !== 'undefined' && Howler.ctx && Howler.ctx.state === 'suspended') {
+        document.addEventListener(
+          'touchstart',
+          () => {
+            Howler.ctx.resume().then(() => {
+              console.log('🔊 Howler AudioContext resumed');
+            });
+          },
+          { once: true } // ← 1回だけでOK
+        );
+      }
     }
 
     //　追加のファイルセットを動的に追加
@@ -660,7 +679,7 @@ class MidiPlayer {
       if (fileSet.mp3File) {
         preloadedSet.sound = new Howl({
           src: [fileSet.mp3File],
-          html5: false,
+          html5: this.howler_html5,
           preload: true,
           onload: () => {
             console.log(`File set:${preloadedSet.name}:${fileSet.mp3File} MP3 loaded`);
@@ -770,7 +789,7 @@ class MidiPlayer {
       console.warn(`this.options.mp3File:${this.options.mp3File}`);
       this.sound = new Howl({
         src: [this.options.mp3File],
-        html5: false,
+        html5: this.howler_html5,
         onload: () => { 
           this.seekBar.max = this.sound.duration(); 
           this.updateTimeDisplay();
