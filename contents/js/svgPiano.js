@@ -846,6 +846,7 @@ class MidiPlayer {
           }
         });
       });
+      return Promise.resolve();
     }
 
     clearScheduledTimeouts() {
@@ -1223,7 +1224,7 @@ class MidiPlayer {
         this.setupMidiPlayer();
       }
     }
-    play() {
+    async play() {
       if (this.isPlaying) {
         this.stop();
         setTimeout(() => {
@@ -1244,7 +1245,7 @@ class MidiPlayer {
       // 既存のendイベントリスナーを削除
       this.currentSound.off('end');
       
-      this.scheduleMidHighlight(this.seekBar.value);
+      await this.scheduleMidHighlight(this.seekBar.value);
       this.currentSound.seek(this.seekBar.value * this.rate);
       this.currentSound.play();
 
@@ -1264,7 +1265,7 @@ class MidiPlayer {
       }
     }
     
-    playSegment(start, end) {
+    async playSegment(start, end) {
       if (this.isPlaying) {
         this.stop();
         setTimeout(() => {
@@ -1296,7 +1297,7 @@ class MidiPlayer {
       
       // 再生開始位置をstart秒に設定(Howlerのseekは速度変更しても不変。scheduleMidHighlightは体感時間に換算して引数に渡す。)
       this.currentSound.seek(start);
-      this.scheduleMidHighlight(start / this.rate);
+      await this.scheduleMidHighlight(start / this.rate);
       
       // 再生開始
       this.currentSound.play();
@@ -1355,10 +1356,10 @@ class MidiPlayer {
       this.updateTimeDisplay();
     }
     
-    scheduleMidHighlight(currentTime) {
+    async scheduleMidHighlight(currentTime) {
       //currentTimeは秒単位の再生位置(tempo変更時は換算後の体感時間の秒)
       if (this.currentMidiPlayer) {
-        this.currentMidiPlayer.scheduleMidHighlight(currentTime);
+        await this.currentMidiPlayer.scheduleMidHighlight(currentTime);
       }
     }
     
