@@ -3,6 +3,7 @@
 	<head>
 		<meta charset="UTF-8">
 		<link rel="icon" type="image/png" sizes="16x16" href="/img/favicon.ico">
+    <script src="/js/get_mp3.js"></script>
     <script src="/js/get_information.js"></script>
     <script src="/js/svgPiano.js"></script>
     <script src="/js/howler.core.js"></script>
@@ -24,7 +25,8 @@
         full: ['/other/Give Thanks(Em)/Give Thanks(Em).mid', [0,1,2,3]],
         vcl_alto: ['/other/Give Thanks(Em)/Give Thanks(Em).mid', 1]
       }
-    </script>  
+    </script>
+    <link rel="stylesheet" href="/css/choir.css">
 		<style type="text/css">
       div.audio-container {
         height: 30px;
@@ -65,7 +67,7 @@
       video    {display: block;
                 max-width: 300px;
                 }
-    </style>
+</style>
 		<title>'大いなる方に(変ホ長調)'パート別練習用音源</title>
 	</head>
 	<body>
@@ -106,6 +108,14 @@
 
 <div id="piano-container"></div>
 
+<div class="nen">
+  <ul style="list-style: none;">
+    <li>
+      <div class="part"><a href='#' onclick="plus_password('./Eb大いなる方に.pdf')">楽　譜</a></div>
+    </li>
+  </ul>
+</div>
+
 <div class='link'>
   <a href='../Carry Me/Carry Me.html'>⇒ Carry Me</a><br>
   <a href='../Give Thanks/Give Thanks.html'>⇒ 大いなる方に（2011.10賛美のアレジメント版）</a><br>
@@ -122,7 +132,9 @@
         white_key_height: 120,
         black_key_width: 24,
         black_key_height: 70,
-        volume: 0.5
+        volume: 0.5,
+        key: '♭3',
+        justIntnation: true
     }
   );
   // パート別に play,pause,stopの各ボタン、seekBar,timeDisplay を作成

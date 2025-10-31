@@ -68,14 +68,12 @@
         width: "";
         display: block;
       }
-      span {
-             vertical-align: super;
-             font-size:0.6em
-           }
       span.part {
-            color : blue;
-            border: solid 1px #454545;
-           }
+        vertical-align: super;
+        font-size:0.6em;
+        color : blue;
+        border: solid 1px #454545;
+      }
     </style>
     <title>'しずかに待てわがたまよ（聖歌294）'パート別練習用音源</title>
   </head>
@@ -190,7 +188,7 @@
     
         <span style="font-size:50%">※ 上付きの数字は何拍伸ばすかを示す.</span>
       </div>
-
+      <br>
       <div id="piano-container"></div>
 
       <div class='link'>
@@ -209,7 +207,9 @@
             white_key_height: 120,
             black_key_width: 24,
             black_key_height: 70,
-            volume: 0.5
+            volume: 0.5,
+            key: '♭1',
+            justIntnation: true
         }
       );
       // パート別に play,pause,stopの各ボタン、seekBar,timeDisplay を作成
