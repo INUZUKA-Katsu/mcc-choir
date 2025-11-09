@@ -35,7 +35,6 @@ class Choir
         return [200,header,[response]]
       
       elsif req.path.include? "Choir.cgi" then
-        p :tout0
         data = JSON.parse(req.body.read)
         data.each{|k,v| "data: #{k.to_s} => #{v}.to_s"}
         puts "path=> "+path
@@ -46,7 +45,7 @@ class Choir
           t = Time.now
           day = "#{t.month.to_s}月#{t.day.to_s}日"
           header["content-type"] = "text/plain;charset=utf-8"
-          response = day + "\n" + data["info"] + "\n\n" + get_information(path)
+          response = day + "\n" + data["info"] + "\n\n" + get_information()
           update_information(response,path)
         else
           header["content-type"] = 'text/plain;charset=utf-8'
@@ -67,7 +66,6 @@ class Choir
         header["content-type"] = 'text/html'        
         response               = html
       when /^\/(?:easter|christmas|other)\/.*html$/i
-        p :rout_when_html
         html_path = File.join("./contents",path)
         html = File.read(html_path)
         # 自動リフレッシュ用のスクリプトを挿入する。
@@ -339,14 +337,11 @@ EOS
   def update_information(new_data,path,count=0)
     info_path   = get_info_path()
     backup_path = info_path.sub(/\.txt/,".bak")
-
     #既存のバックアップファイルを削除する。
     begin  
       @client.delete(backup_path)
-    
     rescue DropboxApi::Errors::NotFoundError
       # バックアップファイルがないとき
-    
     rescue DropboxApi::Errors::ExpiredAccessTokenError
       # アクセストークンが有効期限切れの場合
       if count > 3
