@@ -181,8 +181,8 @@ class SvgPiano {
           console.log(`midiNum:${midiNum}, x:${x} @createKeyLabel()`);
           const y = parentKey.getAttribute('height') - 5 ;
           const style = (i == 0)
-                   ? 'color:black;font-size:12px;font-weight:bold;text-anchor:middle;fill:black;stroke:white;stroke-width:0.5;'
-                   : 'color:white;font-size:12px;font-weight:bold;text-anchor:middle;fill:white;stroke:black;stroke-width:0.5;';
+                   ? 'color:black;font-size:12px;font-family:sans-serif;font-weight:bold;text-anchor:middle;fill:black;stroke:white;stroke-width:0.5;'
+                   : 'color:white;font-size:12px;font-family:sans-serif;font-weight:bold;text-anchor:middle;fill:white;stroke:black;stroke-width:0.5;';
           const tonicLabel = document.createElementNS('http://www.w3.org/2000/svg', 'text');
           tonicLabel.textContent = label;
           tonicLabel.setAttribute('id', `label-${midiNum}`);
