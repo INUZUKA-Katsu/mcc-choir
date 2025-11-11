@@ -25,6 +25,10 @@
                     width: 15em;
                     font-size: 80%;
                 }
+          button:active {
+            background-color: #45a049; /* クリック時の色 */
+            transform: scale(0.95);    /* 少し縮ませて押し込み感を演出 */
+          }
       		@media screen and (min-width: 700px){
               h4       {margin-bottom: 1em;}
               li       {margin-left:1em;margin-bottom:2em;}
