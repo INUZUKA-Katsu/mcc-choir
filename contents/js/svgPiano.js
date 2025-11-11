@@ -987,15 +987,26 @@ class MidiPlayer {
     }
 
     async init() {
-      if (window.AudioContext || window.webkitAudioContext) {
-        this.howler_html5 = false;
-      } else {
+      const isIOS = /iPhone|iPad|iPod/.test(navigator.userAgent);
+      const isAndroid = /Android/.test(navigator.userAgent);
+      const isMobile = isIOS || isAndroid;
+      const iosVersion = isIOS ? this.getIOSVersion() : null;
+      console.warn(`iosVersion:${iosVersion}`);
+      const hasWebAudio = !!(window.AudioContext || window.webkitAudioContext);
+  
+      // モバイル優先 → HTML5 Audio
+      const useHtml5 = (isMobile && (iosVersion == null || iosVersion < 16.0)) || !hasWebAudio;
+      if (useHtml5) {
         this.howler_html5 = true;
+      } else {
+        this.howler_html5 = false;
       }
+      console.warn(`useHtml5:${useHtml5}`);
       if (this.options.mp3File) {
         this.setupMp3();
       }
       if (this.playBtn) this.playBtn.addEventListener('click', () => {
+        unlockAudio();
         if (this.seekBar.value == 0 && this.options.currentFileSetIndex !== 0) {
           this.switchFileSet('Original');
           this.seekBar.max = this.sound.duration();
@@ -1045,8 +1056,9 @@ class MidiPlayer {
       };
 
       if (fileSet.mp3File) {
+        const m4aFile = this.options.mp3File.replace('.mp3','.m4a');
         preloadedSet.sound = new Howl({
-          src: [fileSet.mp3File],
+          src: [m4aFile,fileSet.mp3File],
           html5: this.howler_html5,
           preload: true,
           onload: () => {
@@ -1151,13 +1163,15 @@ class MidiPlayer {
       return this.options.fileSets.length;
     }
 
-    // MP3ファイルをセットアップ
+    // MP3ファイルとm4aファイルをセットアップ(m4aファイルを優先)
     async setupMp3() {
       console.warn("setupMp3開始");
       console.warn(`this.options.mp3File:${this.options.mp3File}`);
+      const m4aFile = this.options.mp3File.replace('.mp3','.m4a');
       this.sound = new Howl({
-        src: [this.options.mp3File],
+        src: [m4aFile,this.options.mp3File],
         html5: this.howler_html5,
+        preload: true,
         onload: () => { 
           this.seekBar.max = this.sound.duration(); 
           this.updateTimeDisplay();
@@ -1421,6 +1435,25 @@ class MidiPlayer {
       const inputElement = document.querySelector(`.tempo-display[name="${this.options.name}"] input`);
       if (inputElement) inputElement.value = `♩=${tempo}`;
     }
+    // iOSのバージョンを取得
+    getIOSVersion() {
+      const ua = navigator.userAgent;
+      const match = ua.match(/OS (\d+)_(\d+)_?(\d+)?/);  // iOS X_Y_Z形式
+      if (!match) return null;
+      return parseFloat(match[1] + '.' + match[2]);  // X.Y形式（例: 15.8 → 15.8）
+    }
   }
 
-
+  // iPhoneの古い機種用（ロックが解除されていないと再生ボタンで音が出ないため）
+  let unlocked = false;
+  function unlockAudio() {
+    // 一度だけロック解除を試みる
+    if (!unlocked && Howler.ctx && Howler.ctx.state === 'suspended') {
+      Howler.ctx.resume().then(() => {
+        unlocked = true;
+        console.log('🔓 AudioContext unlocked!');
+      });
+    }
+  }
+  document.addEventListener('touchstart', unlockAudio, { once: true });
+  document.addEventListener('click', unlockAudio, { once: true });
