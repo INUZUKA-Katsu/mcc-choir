@@ -212,7 +212,7 @@ class Choir
     end
   end
   
-  def get_from_dropbox(path)
+  def get_from_dropbox(path, count=0)
     contents = ""
     unless @client
       begin
@@ -227,9 +227,13 @@ class Choir
         contents << chunk
       end
     rescue DropboxApi::Errors::ExpiredAccessTokenError
+      if count > 3
+        puts "error: access_token is expired and failed to get new token:  @get_from_dropbox #{path}"
+        return ""
+      end
       @access_token = get_dropbox_access_token
       @client = DropboxApi::Client.new(@access_token)
-      get_from_dropbox(path)
+      contents = get_from_dropbox(path, count+1)
     rescue=>e
       p "failed to get from dropbox: #{path} @get_from_dropbox"
       p e.message
@@ -420,7 +424,7 @@ EOS
     end
   end
   def insert_livereload_script(html)
-    return html.sub(/<\/body>/, "<script src=\"http://localhost:35729/livereload.js?snipver=1\"></script>\n</body>")
+    return html.sub(/<\/body>/, "<script src=\"http://inuzuka-m2air.local:35729/livereload.js?snipver=1\"></script>\n</body>")
   end
   def add_date_to_jsurl(html)
     #常に最新ファイルを読み込ませるため.
