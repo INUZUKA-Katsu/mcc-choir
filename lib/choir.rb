@@ -65,7 +65,7 @@ class Choir
         end
         header["content-type"] = 'text/html'        
         response               = html
-      when /^\/(?:easter|christmas|other)\/.*html$/i
+      when /^\/(?:easter|christmas|other)\/.*html/i
         html_path = File.join("./contents",path)
         html = File.read(html_path)
         # 自動リフレッシュ用のスクリプトを挿入する。
@@ -80,13 +80,17 @@ class Choir
         end
         html = remove_video_link(html)
         if html.include?("<!--連絡事項-->") && !html.include?("連絡事項.txt")
-          html = include_information(html)
+          pass = req.params['pass']
+          puts "pass => #{pass}"
+          if pass && password_check(pass)
+            puts "連絡事項をhtmlに組み込む"
+            html = include_information(html)
+          end
         end
         header["content-type"] = 'text/html'        
         response               = html
       when /^\/(?:easter|christmas|other)\/.*(?:mp3|m4a|mid|mxl)$/i
         p :rout_when_mp3_midi_mxl
-        puts "autoreload_test!!!"
         STDOUT.puts "path => #{path}"
         tmp_file = File.join("./tmp",path)
         STDOUT.puts "tmp_file => #{tmp_file}"
@@ -106,8 +110,15 @@ class Choir
           response = get_mp3(path)
           header["content-length"] = response.size.to_s
         end
-      when /連絡事項\.txt$/
-        info = get_information()
+      when /連絡事項\.txt/
+        pass = req.params['pass']
+        puts "pass => #{pass}"
+        if pass && password_check(pass)
+          puts "連絡事項を取得"
+          info = get_information()
+        else
+          info = ""
+        end
         header["content-type"] = 'text/plain;charset=UTF-8'
         response = info
       when /^\/mcc\/.*(pdf|mscz)$/i
@@ -313,6 +324,7 @@ EOS
     html.gsub!(/<a.+onclick.+plus_password\(\).?>(.*)<\/a>/i){$1}
   end
   def include_information(html)
+    puts "include_information実行"
     info = get_information()
     if info
       html.sub!('<!--連絡事項-->',info.force_encoding("utf-8"))
