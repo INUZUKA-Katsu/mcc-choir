@@ -770,9 +770,13 @@ function setAudioControls(containerClassName){
   return audioControls;
 }
 
+// MIDIファイルのキャッシュ（同一ファイルの重複読み込みを防ぐ）
+const midiCache = new Map();
+
 class MidiPlayer {
     constructor(svgPiano, midiFile, OFFSET = 0, midiSegment = null, trackIndex = null){
       this.piano = svgPiano;
+      this.midiFile = midiFile;
       this.loadingPromise = this.loadMidi(midiFile);
       this.OFFSET = OFFSET; // mp3冒頭の無音時間(秒)
       this.midiSegment = midiSegment; // MIDIセグメント
@@ -785,6 +789,18 @@ class MidiPlayer {
     }
     
     async loadMidi(midiFile) {
+      // キャッシュに存在する場合は再利用
+      if (midiCache.has(midiFile)) {
+        console.log(`MIDIファイルをキャッシュから読み込み: ${midiFile}`);
+        const cached = midiCache.get(midiFile);
+        this.midi = cached.midi;
+        this.baseBpm = cached.baseBpm;
+        this.isLoaded = true;
+        return;
+      }
+
+      // 新規読み込み
+      console.log(`MIDIファイルを新規読み込み: ${midiFile}`);
       const midiResponse = await fetch(midiFile);
       const midiArrayBuffer = await midiResponse.arrayBuffer();
       this.midi = new Midi(midiArrayBuffer);
@@ -793,6 +809,12 @@ class MidiPlayer {
       const bpm = this.midi.header.tempos[0]?.bpm || 120;
       this.baseBpm = Math.round(bpm);
       this.isLoaded = true;
+
+      // キャッシュに保存
+      midiCache.set(midiFile, {
+        midi: this.midi,
+        baseBpm: this.baseBpm
+      });
     }
 
     // ========= MIDIハイライトのスケジューリングメソッド =========
