@@ -30,13 +30,6 @@
           bass: '/christmas/King of Love/King of Love-Bass.mid',
           full: '/christmas/King of Love/King of Love(4sei).mid'
         }
-        window.addEventListener("DOMContentLoaded", function () {
-          fetch('/mcc/連絡事項.txt').then(response => response.text()).then(data => {
-            document.getElementById('comuBoard').innerHTML = data;
-          }).catch(error => {
-            console.error('Error fetching the file:', error);
-          });
-        });
 	  </script>
 	  <style type="text/css">
       div.audio-container {
