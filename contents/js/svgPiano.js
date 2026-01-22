@@ -1001,6 +1001,10 @@ class MidiPlayer {
       } else {
         this.howler_html5 = false;
       }
+      // Safariデスクトップ版はHTML5 Audioを使用
+      const isSafari = /^((?!chrome|android).)*safari/i.test(navigator.userAgent);
+      if (isSafari && !isIOS) this.howler_html5 = true;
+
       console.warn(`useHtml5:${useHtml5}`);
       if (this.options.mp3File) {
         this.setupMp3();
@@ -1165,9 +1169,9 @@ class MidiPlayer {
 
     // MP3ファイルとm4aファイルをセットアップ(m4aファイルを優先)
     async setupMp3() {
-      console.warn("setupMp3開始");
-      console.warn(`this.options.mp3File:${this.options.mp3File}`);
+      console.warn("setup mp3/m4a開始");
       const m4aFile = this.options.mp3File.replace('.mp3','.m4a');
+      console.warn(`mp3File, m4aFile: ${this.options.mp3File}, ${m4aFile}`);
       this.sound = new Howl({
         src: [m4aFile,this.options.mp3File],
         html5: this.howler_html5,
