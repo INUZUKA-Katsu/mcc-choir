@@ -1,0 +1,5 @@
+--dir .
+--dir lib
+--pattern **/*.{rb,ru}
+--ignore tmp/*
+--ignore vendor/*
