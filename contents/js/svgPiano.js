@@ -789,32 +789,41 @@ class MidiPlayer {
     }
     
     async loadMidi(midiFile) {
-      // キャッシュに存在する場合は再利用
-      if (midiCache.has(midiFile)) {
-        console.log(`MIDIファイルをキャッシュから読み込み: ${midiFile}`);
-        const cached = midiCache.get(midiFile);
-        this.midi = cached.midi;
-        this.baseBpm = cached.baseBpm;
+      try {
+        // キャッシュに存在する場合は再利用
+        if (midiCache.has(midiFile)) {
+          console.log(`MIDIファイルをキャッシュから読み込み: ${midiFile}`);
+          const cached = midiCache.get(midiFile);
+          this.midi = cached.midi;
+          this.baseBpm = cached.baseBpm;
+          this.isLoaded = true;
+          return;
+        }
+
+        // 新規読み込み
+        console.log(`MIDIファイルを新規読み込み: ${midiFile}`);
+        const midiResponse = await fetch(midiFile);
+        if (!midiResponse.ok) {
+          throw new Error(`MIDI fetch failed: ${midiResponse.status}`);
+        }
+        const midiArrayBuffer = await midiResponse.arrayBuffer();
+        this.midi = new Midi(midiArrayBuffer);
+        console.log(this.midi.tracks.length);
+        console.dir(this.midi.tracks);
+        const bpm = this.midi.header.tempos[0]?.bpm || 120;
+        this.baseBpm = Math.round(bpm);
         this.isLoaded = true;
-        return;
+
+        // キャッシュに保存
+        midiCache.set(midiFile, {
+          midi: this.midi,
+          baseBpm: this.baseBpm
+        });
+      } catch (error) {
+        console.error(`MIDI読み込みエラー: ${midiFile}`, error);
+        this.isLoaded = false;
+        throw error;
       }
-
-      // 新規読み込み
-      console.log(`MIDIファイルを新規読み込み: ${midiFile}`);
-      const midiResponse = await fetch(midiFile);
-      const midiArrayBuffer = await midiResponse.arrayBuffer();
-      this.midi = new Midi(midiArrayBuffer);
-      console.log(this.midi.tracks.length);
-      console.dir(this.midi.tracks);
-      const bpm = this.midi.header.tempos[0]?.bpm || 120;
-      this.baseBpm = Math.round(bpm);
-      this.isLoaded = true;
-
-      // キャッシュに保存
-      midiCache.set(midiFile, {
-        midi: this.midi,
-        baseBpm: this.baseBpm
-      });
     }
 
     // ========= MIDIハイライトのスケジューリングメソッド =========
@@ -823,7 +832,36 @@ class MidiPlayer {
     async scheduleMidHighlight(seekPosition) {
       //console.log(`seekPosition:${seekPosition} @scheduleMidHighlight`);
       //console.trace();
-      await this.loadingPromise; // MIDIファイルが読み込まれるのを待つ
+      
+      // MIDI未読み込みまたは読み込み失敗の場合、再読み込みを試みる
+      if (!this.isLoaded) {
+        console.log('MIDI未読み込みのため再読み込みを試みます');
+        try {
+          this.loadingPromise = this.loadMidi(this.midiFile);
+          await this.loadingPromise;
+        } catch (error) {
+          console.error('MIDI再読み込み失敗:', error);
+          return; // 再読み込みも失敗したらスキップ
+        }
+      }
+      
+      // 念のため loadingPromise を待つ（既に完了していれば即座に通過）
+      try {
+        await this.loadingPromise;
+      } catch (error) {
+        console.error('MIDI読み込み待機エラー:', error);
+        // 既に上で再読み込みを試みているはずだが、念のため再試行
+        if (!this.isLoaded) {
+          console.log('MIDI再読み込みを再度試みます');
+          this.loadingPromise = this.loadMidi(this.midiFile);
+          await this.loadingPromise;
+        }
+      }
+      
+      if (!this.midi || !this.isLoaded) {
+        console.warn('MIDI未読み込みのためハイライトをスキップ');
+        return;
+      }
       
       this.scheduledTimeouts.forEach(clearTimeout);
       this.scheduledTimeouts = [];
@@ -1399,7 +1437,12 @@ class MidiPlayer {
     async scheduleMidHighlight(currentTime) {
       //currentTimeは秒単位の再生位置(tempo変更時は換算後の体感時間の秒)
       if (this.currentMidiPlayer) {
-        await this.currentMidiPlayer.scheduleMidHighlight(currentTime);
+        try {
+          await this.currentMidiPlayer.scheduleMidHighlight(currentTime);
+        } catch (error) {
+          console.warn('MIDIハイライトスケジューリング失敗:', error);
+          // エラーが出ても再生は継続
+        }
       }
     }
     
