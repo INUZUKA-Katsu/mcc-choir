@@ -61,17 +61,6 @@ class Choir
       when /^(\/$|\/index\.html|\/mcc\/index\.html)/i
         p :rout1_index_html
         route_start = Time.now
-        # URLから &pass=xxxxx を抽出してクリーニング
-        pass = nil
-        clean_path = path.split('&').first  # &pass=xxx 以降を削除
-        if path.include?("&pass=")
-          match = path.match(/^(.+?)&pass=(.+)$/)
-          if match
-            clean_path = match[1]
-            pass = match[2]
-          end
-        end
-        pass ||= req.params['pass']
         
         # herokuをリバースプロキシとする場合の「持ち歌一覧に戻る」リンク用
         html_path = File.join("./contents",'index.html')
@@ -81,6 +70,7 @@ class Choir
           html = insert_livereload_script(html)
         end
         # パスワードが有効な場合、すべてのリンクに pass を付与
+        pass = req.params['pass']
         if pass && password_check(pass)
           html = append_pass_to_links(html, pass)
         end
@@ -92,18 +82,10 @@ class Choir
       when /^\/(?:easter|christmas|other)\/.*html/i
         p :rout2_other_html
         route_start = Time.now
-        # URLから &pass=xxxxx を抽出
-        pass = nil
-        clean_path = path
-        if path.include?("&pass=")
-          match = path.match(/^(.+?)&pass=(.+)$/)
-          if match
-            clean_path = match[1]
-            pass = match[2]
-          end
-        end
         
-        html_path = File.join("./contents",clean_path)
+        pass = req.params['pass']
+        p "pass => #{pass}"
+        html_path = File.join("./contents",path)
         html = File.read(html_path)
         STDOUT.puts "[srvt] song File.read: #{(Time.now - route_start).round(3)}s"
         # 自動リフレッシュ用のスクリプトを挿入する。
@@ -118,8 +100,6 @@ class Choir
           load_missing_mp3_in_background(html)
         end
         html = remove_video_link(html)
-        # URLから取得した pass か、req.params から取得した pass のどちらかを使用
-        pass ||= req.params['pass']
         # パスワードが有効な場合
         if pass && password_check(pass)
           # すべてのリンクに pass を付与
@@ -172,9 +152,11 @@ class Choir
         end
         header["content-type"] = 'text/plain;charset=UTF-8'
         response = info
-      when /^\/mcc\/.*(pdf|mscz)$/i
+      when /.*(pdf|mscz)/i
+        p :rout_when_pdf_mscz
         # URL の pass パラメータが有効ならパスワード入力を省略する。
         pass = req.params['pass']
+        p "pass => #{pass}"
         if pass && password_check(pass)
           header,response = return_binary_data(path)
         else
@@ -186,24 +168,6 @@ class Choir
           else
             header,response = return_binary_data(path)
           end
-        end
-      when /password=/
-        ans=path.match(/(.*?)&password=(.*)$/)
-        pass=ans[2]
-        path=ans[1]
-        if password_check(pass)
-          if path.match(/html$/i)
-            html = File.read('.'+path).force_encoding("UTF-8")
-            html = remove_onclick_link(html)
-            header["content-type"] = 'text/html'        
-            response               = html
-          else
-            header,response = return_binary_data(path)    
-          end
-        else
-          html = get_html_format.sub(/<CONTENTS>/,"<h4>パスワードが違います。<a href='#' onclick='history.back();'>戻る</a></h4>")
-          header["content-type"] = 'text/html'
-          response               = html
         end
       else
         p :rout_else
@@ -235,7 +199,9 @@ class Choir
     $list.find{|f| f==File.basename(path).downcase}
   end
   def return_binary_data(path)
+    p :return_binary_data
     src_path = File.join("/mp3",path)
+    p "src_path => " + src_path
     response = get_from_dropbox(src_path)
     header = header_of_binary_data(path)
     header["content-length"] = response.size.to_s
@@ -394,7 +360,9 @@ EOS
       elsif href.include?('pass=')
         "href=#{quote}#{href}#{quote}"
       else
-        "href=#{quote}#{href}&pass=#{escaped_pass}#{quote}"
+        # クエリ文字列がある場合は&、ない場合は?を使用
+        separator = href.include?('?') ? '&' : '?'
+        "href=#{quote}#{href}#{separator}pass=#{escaped_pass}#{quote}"
       end
     end
     html
