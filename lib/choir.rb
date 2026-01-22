@@ -28,7 +28,8 @@ class Choir
     #end
     header  = Hash.new
   	if req.post?
-  	  if req.path=="/get_mp3.cgi" then
+    # POSTリクエストの処理  
+      if req.path=="/get_mp3.cgi" then
         param = req.params
         header["content-type"] = 'text/plain'
         response = get_missing_mp3(param) #戻り値は"done"
@@ -38,8 +39,8 @@ class Choir
         data = JSON.parse(req.body.read)
         data.each{|k,v| "data: #{k.to_s} => #{v}.to_s"}
         puts "path=> "+path
-        #パスワードチェック
-        pass = data["password"]
+        # パスワードチェック（URL の pass パラメータがあれば優先的に利用）
+        pass = data["password"] || req.params['pass']
         p pass
         if password_check(pass)
           t = Time.now
@@ -53,40 +54,90 @@ class Choir
         end    
       end
     else
+    # GETリクエストの処理
       p "path => " + path
       puts "path.match(/^\/(?:easter|christmas|other)\/.*(?:mp3|m4a|mid|mxl)$/i) => #{path.match(/^\/(?:easter|christmas|other)\/.*(?:mp3|m4a|mid|mxl)$/i)}"
       case path
-      when '/mcc/index.html'
+      when /^(\/$|\/index\.html|\/mcc\/index\.html)/i
+        p :rout1_index_html
+        route_start = Time.now
+        # URLから &pass=xxxxx を抽出してクリーニング
+        pass = nil
+        clean_path = path.split('&').first  # &pass=xxx 以降を削除
+        if path.include?("&pass=")
+          match = path.match(/^(.+?)&pass=(.+)$/)
+          if match
+            clean_path = match[1]
+            pass = match[2]
+          end
+        end
+        pass ||= req.params['pass']
+        
         # herokuをリバースプロキシとする場合の「持ち歌一覧に戻る」リンク用
         html_path = File.join("./contents",'index.html')
         html = File.read(html_path)
+        STDOUT.puts "[srvt] index File.read: #{(Time.now - route_start).round(3)}s"
         if ENV['RACK_ENV']=="development"
           html = insert_livereload_script(html)
         end
+        # パスワードが有効な場合、すべてのリンクに pass を付与
+        if pass && password_check(pass)
+          html = append_pass_to_links(html, pass)
+        end
+        # 計測用プローブを注入 読込遅延が解決したためコメント化
+        #html = insert_perf_probe(html)
+        #STDOUT.puts "[srvt] index total build: #{(Time.now - route_start).round(3)}s"
         header["content-type"] = 'text/html'        
         response               = html
       when /^\/(?:easter|christmas|other)\/.*html/i
-        html_path = File.join("./contents",path)
+        p :rout2_other_html
+        route_start = Time.now
+        # URLから &pass=xxxxx を抽出
+        pass = nil
+        clean_path = path
+        if path.include?("&pass=")
+          match = path.match(/^(.+?)&pass=(.+)$/)
+          if match
+            clean_path = match[1]
+            pass = match[2]
+          end
+        end
+        
+        html_path = File.join("./contents",clean_path)
         html = File.read(html_path)
+        STDOUT.puts "[srvt] song File.read: #{(Time.now - route_start).round(3)}s"
         # 自動リフレッシュ用のスクリプトを挿入する。
         if ENV['RACK_ENV']=="development"
           html = insert_livereload_script(html)
         end
         # jsファイルにキャッシュが効かないように日時を付加する。
         html = add_date_to_jsurl(html)
+        STDOUT.puts "[srvt] song add_date_to_jsurl: #{(Time.now - route_start).round(3)}s"
         # バックエンドで音源ファイルを調べ、ない場合は、自動でダウンロードする。
         Thread.new do
           load_missing_mp3_in_background(html)
         end
         html = remove_video_link(html)
-        if html.include?("<!--連絡事項-->") && !html.include?("連絡事項.txt")
-          pass = req.params['pass']
-          puts "pass => #{pass}"
-          if pass && password_check(pass)
-            puts "連絡事項をhtmlに組み込む"
+        # URLから取得した pass か、req.params から取得した pass のどちらかを使用
+        pass ||= req.params['pass']
+        # パスワードが有効な場合
+        if pass && password_check(pass)
+          # すべてのリンクに pass を付与
+          p :append_pass_to_links
+          t0 = Time.now
+          html = append_pass_to_links(html, pass)
+          STDOUT.puts "[srvt] song append_pass_to_links: #{(Time.now - t0).round(3)}s"
+          # 連絡事項のテキストエリアがあるときは連絡事項を組み込む
+          if html.include?("<!--連絡事項-->") && !html.include?("連絡事項.txt")
+            p :include_information
+            t1 = Time.now
             html = include_information(html)
+            STDOUT.puts "[srvt] song include_information: #{(Time.now - t1).round(3)}s"
           end
         end
+        # 計測用プローブを注入
+        #html = insert_perf_probe(html)
+        #STDOUT.puts "[srvt] song total build: #{(Time.now - route_start).round(3)}s"
         header["content-type"] = 'text/html'        
         response               = html
       when /^\/(?:easter|christmas|other)\/.*(?:mp3|m4a|mid|mxl)$/i
@@ -122,14 +173,19 @@ class Choir
         header["content-type"] = 'text/plain;charset=UTF-8'
         response = info
       when /^\/mcc\/.*(pdf|mscz)$/i
-        #パスワード管理するファイルの場合は、その旨を表示してブロックする。
-        if need_password?(path)
-          html = get_html_format.sub(/<CONTENTS>/,"<h4>パスワードが必要です。</h4>")
-          header["content-type"] = 'text/html'        
-          response               = html
-        else
-          #p path
+        # URL の pass パラメータが有効ならパスワード入力を省略する。
+        pass = req.params['pass']
+        if pass && password_check(pass)
           header,response = return_binary_data(path)
+        else
+          #パスワード管理するファイルの場合は、その旨を表示してブロックする。
+          if need_password?(path)
+            html = get_html_format.sub(/<CONTENTS>/,"<h4>パスワードが必要です。</h4>")
+            header["content-type"] = 'text/html'        
+            response               = html
+          else
+            header,response = return_binary_data(path)
+          end
         end
       when /password=/
         ans=path.match(/(.*?)&password=(.*)$/)
@@ -323,6 +379,26 @@ EOS
   def remove_onclick_link(html)
     html.gsub!(/<a.+onclick.+plus_password\(\).?>(.*)<\/a>/i){$1}
   end
+  def append_pass_to_links(html, pass)
+    # すべてのサイト内 .html リンクに pass パラメータを付与（外部リンクは除外）
+    escaped_pass = CGI.escape(pass)
+    html.gsub!(/href=( ["'] ) ( [^"']+?\.html ) ( [^"']* ) \1/ix) do
+      quote = $1
+      base  = $2    # ～.html まで
+      rest  = $3    # クエリやアンカーなど（任意）
+      href  = base + rest
+      # 外部リンクや mailto は対象外
+      if href =~ /^(https?:|mailto:)/i
+        "href=#{quote}#{href}#{quote}"
+      # すでに pass= 付与済みなら何もしない
+      elsif href.include?('pass=')
+        "href=#{quote}#{href}#{quote}"
+      else
+        "href=#{quote}#{href}&pass=#{escaped_pass}#{quote}"
+      end
+    end
+    html
+  end
   def include_information(html)
     puts "include_information実行"
     info = get_information()
@@ -436,7 +512,61 @@ EOS
     end
   end
   def insert_livereload_script(html)
-    return html.sub(/<\/body>/, "<script src=\"http://inuzuka-m2air.local:35729/livereload.js?snipver=1\"></script>\n</body>")
+    return html unless ENV['LIVERELOAD'] == '1'
+    host = ENV['LIVERELOAD_HOST'] || 'http://localhost:35729'
+    loader = <<~EOS
+      <script>
+        (function(){
+          try {
+            var s=document.createElement('script');
+            s.src='#{host}/livereload.js?snipver=1';
+            s.async=true; // DOMContentLoaded をブロックしない
+            s.onerror=function(){ console.log('[probe] livereload connect failed'); };
+            (document.head||document.documentElement).appendChild(s);
+          } catch(e) { console.log('[probe] livereload loader error', e && e.message); }
+        })();
+      </script>
+    EOS
+    return html.sub(/<\/body>/i, loader + "\n</body>")
+  end
+  def insert_perf_probe(html)
+    probe = <<~EOS
+      <script>
+        (function(){
+          const t0 = performance.now();
+          try {
+            console.log('[probe] inline start', t0.toFixed(1));
+            document.addEventListener('readystatechange', function(){
+              console.log('[probe] readyState=', document.readyState, performance.now().toFixed(1));
+            });
+            document.addEventListener('DOMContentLoaded', function(){
+              console.log('[probe] DOMContentLoaded', performance.now().toFixed(1));
+            });
+            window.addEventListener('load', function(){
+              console.log('[probe] window load', performance.now().toFixed(1));
+            });
+            // audio メタデータ監視
+            window.addEventListener('load', function(){
+              var audios = document.querySelectorAll('audio');
+              audios.forEach(function(a, i){
+                a.addEventListener('loadedmetadata', function(){
+                  console.log('[probe] audio metadata', i, (a.currentSrc||a.src||'').slice(0,120), performance.now().toFixed(1));
+                });
+              });
+            });
+            // 定期的に最近のリソース状況を出す
+            setTimeout(function(){
+              try {
+                var entries = performance.getEntriesByType('resource') || [];
+                var last = entries.slice(-10).map(function(e){ return [e.initiatorType, e.name.slice(0,100), Math.round(e.duration)]; });
+                console.log('[probe] last resources', last);
+              } catch(e){}
+            }, 5000);
+          } catch(e) { console.log('[probe] error', e && e.message); }
+        })();
+      </script>
+    EOS
+    html.sub(/<\/head>/i, probe + "\n</head>")
   end
   def add_date_to_jsurl(html)
     #常に最新ファイルを読み込ませるため.
