@@ -12,20 +12,28 @@
     <script src="https://unpkg.com/@tonejs/midi"></script>
     <script type="text/javascript">
       const mp3Files = {
-        soprano : '/easter/ShizukaniMate/ShizukaniMate(soprano).mp3',
-        soprano_amen : '/easter/ShizukaniMate/ShizukaniMate(soprano_amen).mp3',
-        alto    : '/easter/ShizukaniMate/ShizukaniMate(alto).mp3',
-        tenor   : '/easter/ShizukaniMate/ShizukaniMate(tenor).mp3',
-        bass    : '/easter/ShizukaniMate/ShizukaniMate(bass).mp3',
-        full    : '/easter/ShizukaniMate.mp3',
+        soprano : '/easter/ShizukaniMate/しずかに待てわがたまよ(soprano).mp3',
+        alto    : '/easter/ShizukaniMate/しずかに待てわがたまよ(alto).mp3',
+        tenor   : '/easter/ShizukaniMate/しずかに待てわがたまよ(tenor).mp3',
+        bass    : '/easter/ShizukaniMate/しずかに待てわがたまよ(bass).mp3',
+        full    : '/easter/ShizukaniMate/しずかに待てわがたまよ(full).mp3',
+        vcl_soprano : '/easter/ShizukaniMate/しずかに待てわがたまよ(vcl_soprano).mp3',
+        vcl_alto    : '/easter/ShizukaniMate/しずかに待てわがたまよ(vcl_alto).mp3',
+        vcl_tenor   : '/easter/ShizukaniMate/しずかに待てわがたまよ(vcl_tenor).mp3',
+        vcl_bass    : '/easter/ShizukaniMate/しずかに待てわがたまよ(vcl_bass).mp3',
+        vcl_full    : '/easter/ShizukaniMate/しずかに待てわがたまよ(vcl_full).mp3'
       };
       const midiFiles = {
-        soprano : ['/easter/ShizukaniMate/ShizukaniMate.mid',0],
-        soprano_amen : ['/easter/ShizukaniMate/ShizukaniMate(soprano_amen).mid',0],
-        alto    : ['/easter/ShizukaniMate/ShizukaniMate.mid',1],
-        tenor   : ['/easter/ShizukaniMate/ShizukaniMate.mid',2],
-        bass    : ['/easter/ShizukaniMate/ShizukaniMate.mid',3],
-        full    : ['/easter/ShizukaniMate/ShizukaniMate.mid',[0,1,2,3]]
+        soprano : ['/easter/ShizukaniMate/しずかに待てわがたまよ.mid',0],
+        alto    : ['/easter/ShizukaniMate/しずかに待てわがたまよ.mid',1],
+        tenor   : ['/easter/ShizukaniMate/しずかに待てわがたまよ.mid',2],
+        bass    : ['/easter/ShizukaniMate/しずかに待てわがたまよ.mid',3],
+        full    : ['/easter/ShizukaniMate/しずかに待てわがたまよ.mid',[0,1,2,3]],
+        vcl_soprano : ['/easter/ShizukaniMate/しずかに待てわがたまよ.mid',0],
+        vcl_alto    : ['/easter/ShizukaniMate/しずかに待てわがたまよ.mid',1],
+        vcl_tenor   : ['/easter/ShizukaniMate/しずかに待てわがたまよ.mid',2],
+        vcl_bass    : ['/easter/ShizukaniMate/しずかに待てわがたまよ.mid',3],
+        vcl_full    : ['/easter/ShizukaniMate/しずかに待てわがたまよ.mid',[0,1,2,3]]
       };
       const ranges = {
             'A':'0,11.2',
@@ -97,6 +105,8 @@
             <button class="playBtn" name='G'>G</button>
             <button class="playBtn" name='G2'>G2</button>
           </div>
+          <div class="vcl">AI Vocal</div>
+          <div class="audio-container" name="vcl_soprano"></div>
         </li>
         <li>
           <div class="part">アルト</div>
@@ -110,6 +120,8 @@
             <button class="playBtn" name='F'>F</button>
             <button class="playBtn" name='G'>G</button>
           </div>
+          <div class="vcl">AI Vocal</div>
+          <div class="audio-container" name="vcl_alto"></div>
         </li>
         <li>
           <div class="part">テノール</div>
@@ -123,6 +135,8 @@
             <button class="playBtn" name='F'>F</button>
             <button class="playBtn" name='G'>G</button>
           </div>
+          <div class="vcl">AI Vocal</div>
+          <div class="audio-container" name="vcl_tenor"></div>
         </li>
         <li>
           <div class="part">バス</div>
@@ -136,6 +150,8 @@
             <button class="playBtn" name='F'>F</button>
             <button class="playBtn" name='G'>G</button>
           </div>
+          <div class="vcl">AI Vocal</div>
+          <div class="audio-container" name="vcl_bass"></div>
         </li>
         <li>
           <div class="part">コーラス</div>
@@ -149,6 +165,8 @@
             <button class="playBtn" name='F'>F</button>
             <button class="playBtn" name='G'>G</button>
           </div>
+          <div class="vcl">AI Vocal</div>
+          <div class="audio-container" name="vcl_full"></div>
         </li>
         <li>
           <div class="part">Be Still My Soul (Exultate Singers)</div>
@@ -260,14 +278,6 @@
             }
           }
         });
-      });
-      // ソプラノのG2の音源等ファイルセットを追加
-      const sopranoAudioControl = audioControls.find(control => control.options.name === 'soprano');
-      sopranoAudioControl.addFileSet({
-        mp3File: mp3Files['soprano_amen'],
-        midiFile: midiFiles['soprano_amen'][0],
-        trackIndex: midiFiles['soprano_amen'][1],
-        name: 'soprano_amen'
       });
     </script>
   </body>

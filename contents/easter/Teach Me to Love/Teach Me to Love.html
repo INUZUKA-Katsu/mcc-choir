@@ -19,7 +19,7 @@
           "vcl_soprano" : '/easter/Teach Me to Love/Teach Me to Love(vcl_soprano).mp3',
           "vcl_alto"    : '/easter/Teach Me to Love/Teach Me to Love(vcl_alto).mp3',
           "vcl_tenor"   : '/easter/Teach Me to Love/Teach Me to Love(vcl_tenor).mp3',
-          "vcl_full"    : '/easter/Teach Me to Love/Teach Me to Love(vcl_full).mp3'
+          "vcl_full"    : '/easter/Teach Me to Love/Teach Me to Love(vcl_choir).mp3'
         };
         const midiFiles = {
           soprano: ['/easter/Teach Me to Love/Teach Me to Love.mid', 0],
@@ -134,9 +134,31 @@
       mp3File: mp3Files[name],
       midiFile: midiFiles[name.replace('vcl_', '')][0],
       trackIndex: midiFiles[name.replace('vcl_', '')][1],
-      OFFSET:-0.1 // MP3とmidiの演奏開始のタイミング合わせ。例：1.3 ⇒ midiのスタートを1.3秒遅らせる。
+      OFFSET:0 // MP3とmidiの演奏開始のタイミング合わせ。例：1.3 ⇒ midiのスタートを1.3秒遅らせる。
     });
   });
+
+  // デバッグ用：MIDIトラック情報を表示
+  setTimeout(() => {
+    console.log('=== MIDI トラック情報のデバッグ ===');
+    audioControls.forEach(ac => {
+      const mp = ac.midiPlayer;
+      if (mp && mp.midi) {
+        console.log('\n--- ' + ac.options.name + ' ---');
+        console.log('指定trackIndex: ' + mp.trackIndex);
+        console.log('全トラック数: ' + mp.midi.tracks.length);
+        
+        mp.midi.tracks.forEach((track, idx) => {
+          const noteCount = track.notes ? track.notes.length : 0;
+          const trackName = track.name || '(名前なし)';
+          console.log('Track ' + idx + ': "' + trackName + '", Notes: ' + noteCount);
+        });
+        
+        const converted = mp.convertedTrackIndex();
+        console.log('変換後のトラック番号: ' + converted);
+      }
+    });
+  }, 2000);
 </script>
 	</body>
 </html>
