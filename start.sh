@@ -17,13 +17,9 @@ osascript <<EOF
 tell application "Terminal"
     activate
     -- 1つ目のタブ 監視サーバーを起動
-    tell application "System Events" to keystroke "t" using command down
-    delay 0.1
-    do script "$CMD_GUARD" in front window
-    
+    do script "$CMD_GUARD"
+    delay 0.5
     -- 2つ目のタブ　rerunを起動し、その上でPumaを起動
-    tell application "System Events" to keystroke "t" using command down
-    delay 0.1
-    do script "$CMD_PUMA" in front window
+    do script "$CMD_PUMA"
 end tell
 EOF
