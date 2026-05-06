@@ -30,6 +30,7 @@ class SvgPiano {
 
     // 和音機能用プロパティ
     this.highlightedKeys = new Set(); // ハイライトされた鍵盤のMIDI番号を格納
+    this.chordTimeouts = []; // 和音再生用setTimeoutのIDを格納
 
     this.init();
   }
@@ -488,23 +489,30 @@ class SvgPiano {
   
   // 和音を再生
   playChord() {
+    // 未発火のsetTimeoutをキャンセル
+    this.chordTimeouts.forEach(id => clearTimeout(id));
+    this.chordTimeouts = [];
+
     // 既存の音を停止
     this.stopChord();
     
     // ハイライトされたキーを同時に再生
     const highlightedKeysArray = Array.from(this.highlightedKeys);
+    // 音数に応じて音量をスケール（多音でもクリッピングしないよう調整）
+    const scaledVolume = 0.7 / Math.sqrt(highlightedKeysArray.length || 1);
     highlightedKeysArray.forEach((midi, index) => {
-      setTimeout(() => {
+      const id = setTimeout(() => {
         console.log(`${midi} @playChord`);
         const playNoteOption = {
           ...this.playNoteOption,
           ...{
-              duration:20,
-              volume:0.7
+              duration: 20,
+              volume: scaledVolume
             }
-        }
+        };
         playNote(midi, playNoteOption);
       }, index * 500);
+      this.chordTimeouts.push(id);
     });
   }
 
@@ -525,11 +533,14 @@ class SvgPiano {
   
   // AudioContextのアクティブ化
   setupEventListeners() {
+    // { once: true } を使わず永続リスナーにする。
+    // Safariはバックグラウンド復帰時にAudioContextを再びsuspendするため、
+    // 1回限りのリスナーでは復帰後に音が出なくなる。
     document.addEventListener('click', () => {
       if (audioCtx.state === "suspended") {
         audioCtx.resume();
       }
-    }, { once: true });
+    });
   }
 }
 
@@ -591,6 +602,11 @@ function getTonicKey(signeture){
 
 // SVGのピアノ鍵盤で音を出す関数
 function playNote(midi, {volume = 0.25, duration = 2, oscType = "triangle", tuning = 440, key = "C", justIntnation = false}) {
+  // Safariのバックグラウンド復帰後など、suspendされていれば再開する
+  if (audioCtx.state === "suspended") {
+    audioCtx.resume();
+  }
+
   // 同じ番号の既存の音を止める
   stopNote(midi);
 
